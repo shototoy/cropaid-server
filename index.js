@@ -14,8 +14,8 @@ import pool from './db.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load .env from the script's directory
-dotenv.config({ path: join(__dirname, '.env') });
+// Load .env from the root directory
+dotenv.config({ path: join(__dirname, '..', '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -141,7 +141,7 @@ app.post('/api/auth/register', async (req, res) => {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 farmerId, userId, data.rsbsaId, data.firstName, data.middleName || null, data.lastName,
-                data.tribe || null, data.streetSitio || null, data.barangay || null, 
+                data.tribe || null, data.streetSitio || null, data.barangay || null,
                 data.municipality || 'Norala', data.province || 'South Cotabato',
                 data.cellphone || null, data.sex || null, dob, data.civilStatus || null
             ]
@@ -153,9 +153,9 @@ app.post('/api/auth/register', async (req, res) => {
                 boundary_north, boundary_south, boundary_east, boundary_west, farm_size_hectares
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                farmId, farmerId, data.farmSitio || null, data.farmBarangay || null, 
+                farmId, farmerId, data.farmSitio || null, data.farmBarangay || null,
                 data.farmMunicipality || 'Norala', data.farmProvince || 'South Cotabato',
-                data.boundaryNorth || null, data.boundarySouth || null, 
+                data.boundaryNorth || null, data.boundarySouth || null,
                 data.boundaryEast || null, data.boundaryWest || null,
                 data.farmSize ? parseFloat(data.farmSize) : null
             ]
@@ -223,7 +223,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/weather', async (req, res) => {
     try {
         const { lat = 6.2341, lon = 124.8741 } = req.query;
-        
+
         if (WEATHER_API_KEY) {
             const response = await fetch(
                 `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric`
@@ -240,11 +240,11 @@ app.get('/api/weather', async (req, res) => {
                 timestamp: new Date().toISOString()
             });
         }
-        
+
         const hour = new Date().getHours();
         const conditions = ['Sunny', 'Partly Cloudy', 'Cloudy', 'Light Rain', 'Thunderstorm'];
         const temps = [28, 30, 32, 34, 31, 29];
-        
+
         res.json({
             temperature: temps[hour % temps.length] + Math.floor(Math.random() * 3),
             condition: conditions[hour % conditions.length],
@@ -328,8 +328,8 @@ app.post('/api/reports', authenticateToken, async (req, res) => {
             `INSERT INTO reports (id, user_id, type, details, location, latitude, longitude, photo_base64)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                reportId, req.user.id, data.type, 
-                JSON.stringify(data.details || {}), 
+                reportId, req.user.id, data.type,
+                JSON.stringify(data.details || {}),
                 data.location || null,
                 data.latitude || null,
                 data.longitude || null,
@@ -740,12 +740,12 @@ app.get('/api/notifications/unread-count', authenticateToken, async (req, res) =
         let query = `SELECT COUNT(*) as count FROM notifications 
                      WHERE (user_id = ? OR (user_id IS NULL AND ? = 'admin')) AND is_read = FALSE`;
         const params = [req.user.id, req.user.role];
-        
+
         if (since) {
             query += ` AND created_at > ?`;
             params.push(since);
         }
-        
+
         const [rows] = await pool.execute(query, params);
         res.json({ count: rows[0].count });
     } catch (err) {
