@@ -2,6 +2,19 @@
 -- Municipality of Norala, South Cotabato
 
 -- =====================
+-- DROP TABLES (in reverse order of creation due to foreign keys)
+-- =====================
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS reports;
+DROP TABLE IF EXISTS farms;
+DROP TABLE IF EXISTS farmers;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS pest_categories;
+DROP TABLE IF EXISTS crop_types;
+DROP TABLE IF EXISTS barangays;
+DROP TABLE IF EXISTS system_settings;
+
+-- =====================
 -- USERS TABLE
 -- =====================
 CREATE TABLE IF NOT EXISTS users (
