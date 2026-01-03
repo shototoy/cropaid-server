@@ -1002,17 +1002,10 @@ app.get('/api/crop-types', async (req, res) => {
 // ============ START SERVER ============
 
 app.listen(PORT, () => {
-    const publicUrl = process.env.PUBLIC_URL;
-    const host = publicUrl || `localhost:${PORT}`;
-    const protocol = publicUrl ? 'https' : 'http';
+    const host = process.env.RAILWAY_PUBLIC_DOMAIN || `localhost:${PORT}`;
+    const protocol = process.env.RAILWAY_PUBLIC_DOMAIN ? 'https' : 'http';
 
     console.log(`✅ CropAid Server running on port ${PORT}`);
-    console.log(`🌐 Environment: ${publicUrl ? 'PRODUCTION' : 'DEVELOPMENT'}`);
-    console.log(`📡 API URL: ${protocol}://${host}/api`);
+    console.log(`🌐 API URL: ${protocol}://${host}/api`);
     console.log(`💚 Health check: ${protocol}://${host}/api/health`);
-
-    if (publicUrl) {
-        console.log(`\n🚀 Copy this to your frontend .env:`);
-        console.log(`   VITE_API_URL=${protocol}://${host}/api\n`);
-    }
 });

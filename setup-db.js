@@ -6,22 +6,26 @@ import { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-dotenv.config({ path: join(__dirname, '..', '.env') });
+dotenv.config({ path: join(__dirname, '.env') });
 
 async function setupDatabase() {
     // Connect without specifying database
     const connection = await mysql.createConnection({
-        host: process.env.DB_HOST || process.env.MYSQL_HOST || 'localhost',
-        user: process.env.DB_USER || process.env.MYSQL_USER || 'root',
-        password: process.env.DB_PASSWORD || process.env.MYSQL_PASSWORD || '',
+        host: process.env.DB_HOST || 'localhost',
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || '',
     });
 
     console.log('Connected to MySQL');
 
+
+    const dbName = process.env.DB_NAME || process.env.MYSQL_DATABASE || 'cropaid';
+    console.log(`Using database: ${dbName}`);
+
     // Drop and create database
-    await connection.query('DROP DATABASE IF EXISTS cropaid');
-    await connection.query('CREATE DATABASE cropaid');
-    await connection.query('USE cropaid');
+    await connection.query(`DROP DATABASE IF EXISTS ${dbName}`);
+    await connection.query(`CREATE DATABASE ${dbName}`);
+    await connection.query(`USE ${dbName}`);
     console.log('Database created');
 
     // Read and execute schema
