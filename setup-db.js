@@ -18,20 +18,16 @@ async function setupDatabase() {
 
     console.log('Connected to MySQL');
 
-
-    const dbName = process.env.DB_NAME || process.env.MYSQL_DATABASE || 'cropaid';
-    console.log(`Using database: ${dbName}`);
-
     // Drop and create database
-    await connection.query(`DROP DATABASE IF EXISTS ${dbName}`);
-    await connection.query(`CREATE DATABASE ${dbName}`);
-    await connection.query(`USE ${dbName}`);
+    await connection.query('DROP DATABASE IF EXISTS cropaid');
+    await connection.query('CREATE DATABASE cropaid');
+    await connection.query('USE cropaid');
     console.log('Database created');
 
     // Read and execute schema
     const schema = fs.readFileSync(join(__dirname, 'schema.sql'), 'utf8');
     const statements = schema.split(';').filter(s => s.trim());
-
+    
     for (const statement of statements) {
         if (statement.trim()) {
             try {
@@ -46,7 +42,7 @@ async function setupDatabase() {
     // Read and execute seed data
     const seed = fs.readFileSync(join(__dirname, 'seed.sql'), 'utf8');
     const seedStatements = seed.split(';').filter(s => s.trim());
-
+    
     for (const statement of seedStatements) {
         if (statement.trim()) {
             try {

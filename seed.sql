@@ -1,22 +1,71 @@
-DELETE FROM reports;
-DELETE FROM farms;
-DELETE FROM farmers;
-DELETE FROM users;
-INSERT INTO users (id, username, email, password_hash, role) VALUES 
-('admin-uuid', 'admin', 'admin@cropaid.gov.ph', '$2b$10$wZ4L3COHDc4tic6TUd5yzeVV73.kuSff9B3p5NQGzpJ0lzbG7ZOqG', 'admin');
-INSERT INTO users (id, username, email, password_hash, role) VALUES 
-('juan-uuid', 'juan', 'juan@gmail.com', '$2b$10$wZ4L3COHDc4tic6TUd5yzeVV73.kuSff9B3p5NQGzpJ0lzbG7ZOqG', 'farmer');
-INSERT INTO farmers (id, user_id, rsbsa_id, first_name, last_name, address_barangay, address_province, cellphone) VALUES 
-('farmer-juan', 'juan-uuid', '012-345-6789', 'Juan', 'dela Cruz', 'San Jose', 'South Cotabato', '09171234567');
-INSERT INTO users (id, username, email, password_hash, role) VALUES 
-('maria-uuid', 'maria', 'maria@gmail.com', '$2b$10$wZ4L3COHDc4tic6TUd5yzeVV73.kuSff9B3p5NQGzpJ0lzbG7ZOqG', 'farmer');
-INSERT INTO farmers (id, user_id, rsbsa_id, first_name, last_name, address_barangay, address_province, cellphone) VALUES 
-('farmer-maria', 'maria-uuid', '012-987-6543', 'Maria', 'Santos', 'Liberty', 'South Cotabato', '09181234567');
-INSERT INTO farms (id, farmer_id, location_barangay, location_province, location_municipality) VALUES 
-('farm-juan', 'farmer-juan', 'San Jose', 'South Cotabato', 'Norala');
-INSERT INTO farms (id, farmer_id, location_barangay, location_province, location_municipality) VALUES 
-('farm-maria', 'farmer-maria', 'Liberty', 'South Cotabato', 'Norala');
-INSERT INTO reports (id, user_id, type, status, details, location, created_at) VALUES 
-('report-1', 'juan-uuid', 'pest', 'pending', '{\"crop\":\"Rice\", \"pestType\":\"Black Bug\", \"severity\":\"High\", \"description\":\"Black bug infestation observed in 2 hectares.\"}', 'San Jose', DATE_SUB(NOW(), INTERVAL 2 DAY)),
-('report-2', 'juan-uuid', 'flood', 'verified', '{\"crop\":\"Corn\", \"severity\":\"Critical\", \"description\":\"River overflow caused flooding.\"}', 'San Jose', DATE_SUB(NOW(), INTERVAL 5 DAY)),
-('report-3', 'maria-uuid', 'drought', 'resolved', '{\"crop\":\"Rice\", \"severity\":\"Medium\", \"description\":\"Lack of water supply affecting rice growth.\"}', 'Liberty', DATE_SUB(NOW(), INTERVAL 10 DAY));
+-- CropAid Database Seed Data
+-- Clean database and insert initial data
+
+-- Clear existing data (order matters due to foreign keys)
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE notifications;
+TRUNCATE TABLE reports;
+TRUNCATE TABLE farms;
+TRUNCATE TABLE farmers;
+TRUNCATE TABLE users;
+TRUNCATE TABLE pest_categories;
+TRUNCATE TABLE crop_types;
+TRUNCATE TABLE barangays;
+TRUNCATE TABLE system_settings;
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- =====================
+-- ADMIN USER
+-- =====================
+-- Password: admin123 (bcryptjs hash)
+INSERT INTO users (id, username, email, password_hash, role, is_active) VALUES 
+('550e8400-e29b-41d4-a716-446655440000', 'admin', 'admin@cropaid.gov.ph', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', TRUE);
+
+-- =====================
+-- BARANGAYS OF NORALA
+-- =====================
+INSERT INTO barangays (name, municipality, province) VALUES
+('Poblacion', 'Norala', 'South Cotabato'),
+('San Jose', 'Norala', 'South Cotabato'),
+('Liberty', 'Norala', 'South Cotabato'),
+('Esperanza', 'Norala', 'South Cotabato'),
+('Dumaguil', 'Norala', 'South Cotabato'),
+('Tinago', 'Norala', 'South Cotabato'),
+('Kibid', 'Norala', 'South Cotabato'),
+('Lapuz', 'Norala', 'South Cotabato'),
+('Bunao', 'Norala', 'South Cotabato'),
+('Palavilla', 'Norala', 'South Cotabato'),
+('Mabini', 'Norala', 'South Cotabato'),
+('Puti', 'Norala', 'South Cotabato');
+
+-- =====================
+-- PEST CATEGORIES
+-- =====================
+INSERT INTO pest_categories (name, description, severity_level, affected_crops, is_active) VALUES
+('Black Bug', 'Rice black bug infestation that damages rice plants', 'high', 'Rice', TRUE),
+('Rice Stem Borer', 'Larvae bore into rice stems causing deadhearts', 'high', 'Rice', TRUE),
+('Brown Planthopper', 'Sap-sucking insect causing hopper burn in rice', 'critical', 'Rice', TRUE),
+('Corn Borer', 'Larvae tunnel into corn stalks and ears', 'high', 'Corn', TRUE),
+('Armyworm', 'Caterpillars that feed on leaves of various crops', 'medium', 'Rice,Corn,Vegetables', TRUE),
+('Rats', 'Rodents damaging crops in field and storage', 'medium', 'Rice,Corn', TRUE),
+('Golden Apple Snail', 'Invasive snail that feeds on young rice seedlings', 'high', 'Rice', TRUE),
+('Tungro Virus', 'Viral disease transmitted by green leafhoppers', 'critical', 'Rice', TRUE);
+
+-- =====================
+-- CROP TYPES
+-- =====================
+INSERT INTO crop_types (name, description, season, is_active) VALUES
+('Rice', 'Primary staple crop', 'Wet/Dry Season', TRUE),
+('Corn', 'Major grain crop for food and feed', 'Dry Season', TRUE),
+('Vegetables', 'Various vegetable crops', 'Year-round', TRUE),
+('Coconut', 'Perennial tree crop', 'Year-round', TRUE),
+('Banana', 'Fruit crop', 'Year-round', TRUE),
+('Sugarcane', 'Industrial crop', 'Dry Season', TRUE);
+
+-- =====================
+-- SYSTEM SETTINGS
+-- =====================
+INSERT INTO system_settings (setting_key, setting_value, description) VALUES
+('app_name', 'CropAid', 'Application name'),
+('municipality', 'Norala', 'Target municipality'),
+('province', 'South Cotabato', 'Target province');
