@@ -11,9 +11,9 @@ dotenv.config({ path: join(__dirname, '..', '.env') });
 async function setupDatabase() {
     // Connect without specifying database
     const connection = await mysql.createConnection({
-        host: process.env.DB_HOST || 'localhost',
-        user: process.env.DB_USER || 'root',
-        password: process.env.DB_PASSWORD || '',
+        host: process.env.DB_HOST || process.env.MYSQL_HOST || 'localhost',
+        user: process.env.DB_USER || process.env.MYSQL_USER || 'root',
+        password: process.env.DB_PASSWORD || process.env.MYSQL_PASSWORD || '',
     });
 
     console.log('Connected to MySQL');

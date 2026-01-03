@@ -8,15 +8,16 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '..', '.env') });
 
 if (!process.env.DATABASE_URL) {
-    if (!process.env.DB_HOST) {
+    if (!process.env.DB_HOST && !process.env.MYSQL_HOST) {
         console.warn("WARNING: Database connection variables not found.");
     }
 }
+
 const pool = mysql.createPool(process.env.DATABASE_URL || {
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'cropaid',
+    host: process.env.DB_HOST || process.env.MYSQL_HOST || 'localhost',
+    user: process.env.DB_USER || process.env.MYSQL_USER || 'root',
+    password: process.env.DB_PASSWORD || process.env.MYSQL_PASSWORD || '',
+    database: process.env.DB_NAME || process.env.MYSQL_DATABASE || 'cropaid',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
