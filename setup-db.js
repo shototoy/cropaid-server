@@ -9,6 +9,8 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '.env') });
 
 async function setupDatabase() {
+    const dbName = process.env.DB_NAME || 'cropaid';
+    
     // Connect without specifying database
     const connection = await mysql.createConnection({
         host: process.env.DB_HOST || 'localhost',
@@ -19,10 +21,10 @@ async function setupDatabase() {
     console.log('Connected to MySQL');
 
     // Drop and create database
-    await connection.query('DROP DATABASE IF EXISTS cropaid');
-    await connection.query('CREATE DATABASE cropaid');
-    await connection.query('USE cropaid');
-    console.log('Database created');
+    await connection.query(`DROP DATABASE IF EXISTS \`${dbName}\``);
+    await connection.query(`CREATE DATABASE \`${dbName}\``);
+    await connection.query(`USE \`${dbName}\``);
+    console.log(`Database '${dbName}' created`);
 
     // Read and execute schema
     const schema = fs.readFileSync(join(__dirname, 'schema.sql'), 'utf8');
