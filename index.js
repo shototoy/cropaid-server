@@ -153,7 +153,7 @@ app.post('/api/auth/register', async (req, res) => {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 userId, data.rsbsaId, data.firstName, data.middleName || null, data.lastName,
-                data.tribe || null, data.streetSitio || null, data.barangay || null, 
+                data.tribe || null, data.streetSitio || null, data.barangay || null,
                 data.municipality || 'Norala', data.province || 'South Cotabato',
                 data.cellphone || null, data.sex || null, dob, data.civilStatus || null
             ]
@@ -167,7 +167,7 @@ app.post('/api/auth/register', async (req, res) => {
                 latitude, longitude, farm_size_hectares
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                farmerId, data.farmSitio || null, data.farmBarangay || null, 
+                farmerId, data.farmSitio || null, data.farmBarangay || null,
                 data.farmMunicipality || 'Norala', data.farmProvince || 'South Cotabato',
                 data.farmLatitude || null, data.farmLongitude || null,
                 data.farmSize ? parseFloat(data.farmSize) : null
@@ -236,7 +236,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/weather', async (req, res) => {
     try {
         const { lat = 6.2341, lon = 124.8741 } = req.query;
-        
+
         if (WEATHER_API_KEY) {
             const response = await fetch(
                 `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric`
@@ -253,11 +253,11 @@ app.get('/api/weather', async (req, res) => {
                 timestamp: new Date().toISOString()
             });
         }
-        
+
         const hour = new Date().getHours();
         const conditions = ['Sunny', 'Partly Cloudy', 'Cloudy', 'Light Rain', 'Thunderstorm'];
         const temps = [28, 30, 32, 34, 31, 29];
-        
+
         res.json({
             temperature: temps[hour % temps.length] + Math.floor(Math.random() * 3),
             condition: conditions[hour % conditions.length],
@@ -451,8 +451,8 @@ app.post('/api/reports', authenticateToken, async (req, res) => {
             `INSERT INTO reports (user_id, type, details, location, latitude, longitude, photo_base64)
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [
-                req.user.id, data.type, 
-                JSON.stringify(data.details || {}), 
+                req.user.id, data.type,
+                JSON.stringify(data.details || {}),
                 data.location || null,
                 data.latitude || null,
                 data.longitude || null,
@@ -698,8 +698,8 @@ app.post('/api/admin/farmers', authenticateToken, requireAdmin, async (req, res)
         const [farmerResult] = await pool.execute(
             `INSERT INTO farmers (user_id, rsbsa_id, first_name, last_name, middle_name, cellphone, address_barangay, address_municipality, address_province)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, rsbsaId, firstName, lastName, middleName || null, cellphone || null, 
-             barangay || 'Unspecified', municipality || 'Norala', province || 'South Cotabato']
+            [userId, rsbsaId, firstName, lastName, middleName || null, cellphone || null,
+                barangay || 'Unspecified', municipality || 'Norala', province || 'South Cotabato']
         );
 
         const farmerId = farmerResult.insertId;
@@ -713,7 +713,7 @@ app.post('/api/admin/farmers', authenticateToken, requireAdmin, async (req, res)
             );
         }
 
-        res.status(201).json({ 
+        res.status(201).json({
             message: 'Farmer created successfully',
             farmerId,
             username,
@@ -733,7 +733,7 @@ app.patch('/api/admin/farmers/:id/status', authenticateToken, requireAdmin, asyn
         const { isActive } = req.body;
         const id = req.params.id;
         const isUUID = id.includes('-');
-        
+
         if (isUUID) {
             // ID is user_id
             await pool.execute(
@@ -762,7 +762,7 @@ app.get('/api/admin/farmers/:id/reports', authenticateToken, requireAdmin, async
     try {
         const id = req.params.id;
         const isUUID = id.includes('-');
-        
+
         let userId;
         if (isUUID) {
             userId = id;
@@ -773,7 +773,7 @@ app.get('/api/admin/farmers/:id/reports', authenticateToken, requireAdmin, async
             }
             userId = farmerRows[0].user_id;
         }
-        
+
         const [reports] = await pool.execute(
             `SELECT id, type, status, location, created_at 
              FROM reports 
@@ -782,7 +782,7 @@ app.get('/api/admin/farmers/:id/reports', authenticateToken, requireAdmin, async
              LIMIT 10`,
             [userId]
         );
-        
+
         res.json({ reports });
     } catch (err) {
         console.error(err);
@@ -795,13 +795,13 @@ app.delete('/api/admin/farmers/:id', authenticateToken, requireAdmin, async (req
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
-        
+
         const id = req.params.id;
         let farmerId, userId;
-        
+
         // Check if ID is a UUID (user_id) or integer (farmer_id)
         const isUUID = id.includes('-');
-        
+
         if (isUUID) {
             // ID is user_id (UUID), find farmer by user_id
             const [farmerRows] = await connection.execute(
@@ -827,20 +827,20 @@ app.delete('/api/admin/farmers/:id', authenticateToken, requireAdmin, async (req
             farmerId = farmerRows[0].id;
             userId = farmerRows[0].user_id;
         }
-        
+
         // Delete related records in order (respecting foreign keys)
         // 1. Delete reports by this user
         await connection.execute('DELETE FROM reports WHERE user_id = ?', [userId]);
-        
+
         // 2. Delete farms by this farmer
         await connection.execute('DELETE FROM farms WHERE farmer_id = ?', [farmerId]);
-        
+
         // 3. Delete farmer record
         await connection.execute('DELETE FROM farmers WHERE id = ?', [farmerId]);
-        
+
         // 4. Delete user account
         await connection.execute('DELETE FROM users WHERE id = ?', [userId]);
-        
+
         await connection.commit();
         res.json({ message: 'Farmer and all associated data deleted successfully' });
     } catch (err) {
@@ -1035,12 +1035,12 @@ app.get('/api/notifications/unread-count', authenticateToken, async (req, res) =
         let query = `SELECT COUNT(*) as count FROM notifications 
                      WHERE (user_id = ? OR (user_id IS NULL AND ? = 'admin')) AND is_read = FALSE`;
         const params = [req.user.id, req.user.role];
-        
+
         if (since) {
             query += ` AND created_at > ?`;
             params.push(since);
         }
-        
+
         const [rows] = await pool.execute(query, params);
         res.json({ count: rows[0].count });
     } catch (err) {
