@@ -3,15 +3,16 @@
 -- =====================
 
 -- Admin (password: cropaid123)
--- Role: admin
 INSERT INTO users (id, username, email, password_hash, role) VALUES 
 ('admin-uuid', 'admin', 'admin@cropaid.gov.ph', '$2b$10$wZ4L3COHDc4tic6TUd5yzeVV73.kuSff9B3p5NQGzpJ0lzbG7ZOqG', 'admin');
 
 -- Farmer 1: Shara Dane Desamero (password: cropaid123)
+-- San Jose, Norala
 INSERT INTO users (id, username, email, password_hash, role) VALUES 
 ('shara-uuid', 'shara.desamero', 'shara@gmail.com', '$2b$10$wZ4L3COHDc4tic6TUd5yzeVV73.kuSff9B3p5NQGzpJ0lzbG7ZOqG', 'farmer');
 
 -- Farmer 2: James Machico (password: cropaid123)
+-- Liberty, Norala
 INSERT INTO users (id, username, email, password_hash, role) VALUES 
 ('james-uuid', 'james.machico', 'james@gmail.com', '$2b$10$wZ4L3COHDc4tic6TUd5yzeVV73.kuSff9B3p5NQGzpJ0lzbG7ZOqG', 'farmer');
 
@@ -67,20 +68,20 @@ INSERT INTO farmers (
 -- FARMS
 -- =====================
 
--- Shara's Farm (San Jose)
+-- Shara's Farm (San Jose, Norala) -> Approx 6.525, 124.675
 INSERT INTO farms (
     farmer_id, location_barangay, location_sitio,
     latitude, longitude, farm_size_hectares
 ) 
-SELECT id, 'San Jose', 'Purok 1', 6.2401, 124.8801, 2.5
+SELECT id, 'San Jose', 'Purok 1', 6.5250, 124.6750, 2.5
 FROM farmers WHERE user_id = 'shara-uuid';
 
--- James's Farm (Liberty)
+-- James's Farm (Liberty, Norala) -> Approx 6.505, 124.655
 INSERT INTO farms (
     farmer_id, location_barangay, location_sitio,
     latitude, longitude, farm_size_hectares
 ) 
-SELECT id, 'Liberty', 'Purok 3', 6.2281, 124.8681, 1.8
+SELECT id, 'Liberty', 'Purok 3', 6.5050, 124.6550, 1.8
 FROM farmers WHERE user_id = 'james-uuid';
 
 
@@ -88,25 +89,25 @@ FROM farmers WHERE user_id = 'james-uuid';
 -- REPORTS
 -- =====================
 
--- Reports from Shara
+-- Reports from Shara (San Jose)
 INSERT INTO reports (user_id, type, status, details, location, latitude, longitude, created_at) VALUES 
 ('shara-uuid', 'pest', 'pending', 
  '{"cropType":"Rice", "pestType":"Rice Black Bug", "severity":"High", "affectedArea":"1.5", "damageLevel":"Severe", "description":"Black bug infestation observed in rice field mostly in the lower part."}', 
- 'San Jose', 6.2401, 124.8801, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+ 'San Jose', 6.5250, 124.6750, DATE_SUB(NOW(), INTERVAL 2 DAY)),
 
 ('shara-uuid', 'drought', 'verified', 
  '{"cropType":"Corn", "severity":"Medium", "affectedArea":"2.0", "damageLevel":"Moderate", "description":"Leaves curling due to lack of water for 2 weeks."}', 
- 'San Jose', 6.2405, 124.8805, DATE_SUB(NOW(), INTERVAL 10 DAY));
+ 'San Jose', 6.5255, 124.6755, DATE_SUB(NOW(), INTERVAL 10 DAY));
 
--- Reports from James
+-- Reports from James (Liberty)
 INSERT INTO reports (user_id, type, status, details, location, latitude, longitude, created_at) VALUES 
 ('james-uuid', 'flood', 'resolved', 
  '{"cropType":"Vegetables", "severity":"Critical", "affectedArea":"0.5", "damageLevel":"Total Loss", "description":"River overflow washed away vegetable plots."}', 
- 'Liberty', 6.2281, 124.8681, DATE_SUB(NOW(), INTERVAL 15 DAY)),
+ 'Liberty', 6.5050, 124.6550, DATE_SUB(NOW(), INTERVAL 15 DAY)),
 
 ('james-uuid', 'pest', 'pending', 
  '{"cropType":"Corn", "pestType":"Army Worm", "severity":"Low", "affectedArea":"0.2", "damageLevel":"Minor", "description":"Early signs of army worm on young corn."}', 
- 'Liberty', 6.2285, 124.8685, NOW());
+ 'Liberty', 6.5055, 124.6555, NOW());
 
 
 -- =====================
@@ -135,8 +136,9 @@ INSERT INTO crop_types (name, description, season) VALUES
 -- =====================
 -- BARANGAYS
 -- =====================
+-- Coordinates adjusted to be within Norala, South Cotabato
 INSERT INTO barangays (name, latitude, longitude) VALUES 
-('San Jose', 6.2401, 124.8801),
-('Liberty', 6.2281, 124.8681),
-('Esperanza', 6.2161, 124.8561),
-('Poblacion', 6.2341, 124.8741);
+('San Jose', 6.5250, 124.6750),
+('Liberty', 6.5050, 124.6550),
+('Esperanza', 6.5500, 124.6900),
+('Poblacion', 6.5180, 124.6660);
