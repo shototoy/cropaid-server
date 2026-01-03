@@ -1002,6 +1002,10 @@ app.get('/api/crop-types', async (req, res) => {
 // ============ START SERVER ============
 
 app.listen(PORT, () => {
-    console.log(`CropAid Server running on port ${PORT}`);
-    console.log(`Health check: http://localhost:${PORT}/api/health`);
+    const host = process.env.RAILWAY_PUBLIC_DOMAIN || `localhost:${PORT}`;
+    const protocol = process.env.RAILWAY_PUBLIC_DOMAIN ? 'https' : 'http';
+
+    console.log(`✅ CropAid Server running on port ${PORT}`);
+    console.log(`🌐 API URL: ${protocol}://${host}/api`);
+    console.log(`💚 Health check: ${protocol}://${host}/api/health`);
 });
