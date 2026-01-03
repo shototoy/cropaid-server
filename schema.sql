@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS farmers (
     sex ENUM('Male', 'Female'),
     date_of_birth DATE,
     civil_status VARCHAR(50),
+    profile_picture LONGTEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -37,6 +38,8 @@ CREATE TABLE IF NOT EXISTS farms (
     boundary_south VARCHAR(255),
     boundary_east VARCHAR(255),
     boundary_west VARCHAR(255),
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
     farm_size_hectares DECIMAL(10,2),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (farmer_id) REFERENCES farmers(id) ON DELETE CASCADE
