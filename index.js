@@ -506,7 +506,7 @@ app.get('/api/reports/history', authenticateToken, async (req, res) => {
         query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
         params.push(limit, offset);
 
-        const [rows] = await pool.execute(query, params);
+        const [rows] = await pool.query(query, params);
 
         let countQuery = `SELECT COUNT(*) as total FROM reports WHERE user_id = ?`;
         const countParams = [req.user.id];
@@ -637,7 +637,7 @@ app.get('/api/admin/farmers', authenticateToken, requireAdmin, async (req, res) 
         query += ` ORDER BY f.last_name ASC LIMIT ? OFFSET ?`;
         params.push(limit, offset);
 
-        const [rows] = await pool.execute(query, params);
+        const [rows] = await pool.query(query, params);
 
         let countQuery = `SELECT COUNT(*) as total FROM farmers f JOIN users u ON f.user_id = u.id WHERE 1=1`;
         const countParams = [];
@@ -854,8 +854,8 @@ app.delete('/api/admin/farmers/:id', authenticateToken, requireAdmin, async (req
 
 app.get('/api/admin/reports', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20;
         const offset = (page - 1) * limit;
         const status = req.query.status;
         const type = req.query.type;
@@ -897,7 +897,7 @@ app.get('/api/admin/reports', authenticateToken, requireAdmin, async (req, res) 
         query += ` ORDER BY r.${sortColumn} ${order} LIMIT ? OFFSET ?`;
         params.push(limit, offset);
 
-        const [rows] = await pool.execute(query, params);
+        const [rows] = await pool.query(query, params);
 
         let countQuery = `SELECT COUNT(*) as total FROM reports r WHERE 1=1`;
         const countParams = [];
