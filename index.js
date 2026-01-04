@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
+import NodeCache from 'node-cache';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -22,6 +24,9 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_change_me';
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY || '';
 
+// Initialize cache (TTL: 1 hour for static data)
+const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
+
 // CORS configuration for separate frontend/backend hosting
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const corsOptions = {
@@ -40,7 +45,8 @@ const corsOptions = {
     allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-// Increase payload limit for Base64 images
+// Middleware
+app.use(compression()); // Compress all responses
 app.use(cors(corsOptions));
 app.use(helmet({
     contentSecurityPolicy: false,
@@ -1122,6 +1128,24 @@ app.patch('/api/notifications/read-all', authenticateToken, async (req, res) => 
     }
 });
 
+app.delete('/api/notifications/:id', authenticateToken, async (req, res) => {
+    try {
+        await pool.execute('DELETE FROM notifications WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+        res.json({ message: 'Notification deleted' });
+    } catch (err) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.delete('/api/notifications/clear-read', authenticateToken, async (req, res) => {
+    try {
+        const [result] = await pool.execute('DELETE FROM notifications WHERE user_id = ? AND is_read = TRUE', [req.user.id]);
+        res.json({ message: 'Read notifications cleared', count: result.affectedRows });
+    } catch (err) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // ============ ADMIN SETTINGS ============
 
 app.get('/api/admin/pest-categories', authenticateToken, requireAdmin, async (req, res) => {
@@ -1300,11 +1324,18 @@ app.patch('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, r
 // ============ PUBLIC ENDPOINTS ============
 
 app.get('/api/barangays', async (req, res) => {
+    const cacheKey = 'barangays';
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     try {
         const [rows] = await pool.execute('SELECT id, name, latitude, longitude FROM barangays ORDER BY name');
-        if (rows.length > 0) return res.json(rows);
+        if (rows.length > 0) {
+            cache.set(cacheKey, rows);
+            return res.json(rows);
+        }
     } catch (err) { }
-    res.json([
+    const fallback = [
         { id: '1', name: 'Poblacion', latitude: 6.2341, longitude: 124.8741 },
         { id: '2', name: 'San Jose', latitude: 6.2401, longitude: 124.8801 },
         { id: '3', name: 'Liberty', latitude: 6.2281, longitude: 124.8681 },
@@ -1315,22 +1346,33 @@ app.get('/api/barangays', async (req, res) => {
         { id: '8', name: 'Kibid', latitude: 6.2581, longitude: 124.8981 },
         { id: '9', name: 'Tinago', latitude: 6.2101, longitude: 124.8501 },
         { id: '10', name: 'Pag-asa', latitude: 6.2641, longitude: 124.9041 }
-    ]);
+    ];
+    cache.set(cacheKey, fallback);
+    res.json(fallback);
 });
 
 app.get('/api/pest-types', async (req, res) => {
+    const cacheKey = 'pest_types';
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     try {
         const [rows] = await pool.execute('SELECT id, name, severity_level FROM pest_categories WHERE is_active = TRUE ORDER BY name');
-        if (rows.length > 0) return res.json(rows);
+        if (rows.length > 0) {
+            cache.set(cacheKey, rows);
+            return res.json(rows);
+        }
     } catch (err) { }
-    res.json([
+    const fallback = [
         { id: '1', name: 'Rice Black Bug', severity_level: 'high' },
         { id: '2', name: 'Rice Stem Borer', severity_level: 'high' },
         { id: '3', name: 'Brown Planthopper', severity_level: 'critical' },
         { id: '4', name: 'Corn Borer', severity_level: 'medium' },
         { id: '5', name: 'Aphids', severity_level: 'low' },
         { id: '6', name: 'Army Worm', severity_level: 'high' }
-    ]);
+    ];
+    cache.set(cacheKey, fallback);
+    res.json(fallback);
 });
 
 app.get('/api/crop-types', async (req, res) => {
