@@ -116,6 +116,35 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 -- =====================
+-- REPORT COMMENTS TABLE
+-- =====================
+CREATE TABLE IF NOT EXISTS report_comments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    report_id INT NOT NULL,
+    user_id CHAR(36) NOT NULL,
+    comment TEXT NOT NULL,
+    is_admin BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =====================
+-- ACTIVITY LOGS TABLE
+-- =====================
+CREATE TABLE IF NOT EXISTS activity_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id CHAR(36) NOT NULL,
+    action_type ENUM('login', 'logout', 'report_submit', 'report_update', 'profile_update', 'farmer_add', 'farmer_update', 'farmer_delete', 'status_change', 'other') NOT NULL,
+    description TEXT,
+    metadata JSON,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =====================
 -- PEST CATEGORIES TABLE
 -- =====================
 CREATE TABLE IF NOT EXISTS pest_categories (
@@ -221,6 +250,17 @@ CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
 CREATE INDEX idx_notifications_type ON notifications(type);
 -- Composite index for unread notifications query
 CREATE INDEX idx_notifications_user_read ON notifications(user_id, is_read);
+
+-- Report Comments indexes
+CREATE INDEX idx_comments_report_id ON report_comments(report_id);
+CREATE INDEX idx_comments_user_id ON report_comments(user_id);
+CREATE INDEX idx_comments_created_at ON report_comments(created_at DESC);
+
+-- Activity Logs indexes
+CREATE INDEX idx_activity_user_id ON activity_logs(user_id);
+CREATE INDEX idx_activity_action_type ON activity_logs(action_type);
+CREATE INDEX idx_activity_created_at ON activity_logs(created_at DESC);
+CREATE INDEX idx_activity_user_created ON activity_logs(user_id, created_at DESC);
 
 -- News indexes
 CREATE INDEX idx_news_is_active ON news(is_active);

@@ -139,6 +139,22 @@ const ReportSchema = z.object({
 
 // ============ MIDDLEWARE ============
 
+// Activity logging helper
+const logActivity = async (userId, actionType, description, metadata = null, req = null) => {
+    try {
+        const ipAddress = req?.ip || req?.connection?.remoteAddress || null;
+        const userAgent = req?.headers?.['user-agent'] || null;
+
+        await pool.execute(
+            `INSERT INTO activity_logs (user_id, action_type, description, metadata, ip_address, user_agent) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [userId, actionType, description, metadata ? JSON.stringify(metadata) : null, ipAddress, userAgent]
+        );
+    } catch (err) {
+        console.error('Activity logging error:', err);
+    }
+};
+
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -255,6 +271,9 @@ app.post('/api/auth/login', async (req, res) => {
             JWT_SECRET,
             { expiresIn: '7d' }
         );
+
+        // Log login activity
+        await logActivity(user.id, 'login', `User logged in successfully`, { role: user.role }, req);
 
         res.json({
             token,
@@ -525,6 +544,15 @@ app.post('/api/reports', authenticateToken, async (req, res) => {
                 [`New Report from ${req.user.name}`, `${req.user.name} filed a ${data.type} report.`, reportId.toString()]
             );
         } catch (e) { /* notifications table might not exist */ }
+
+        // Log activity
+        await logActivity(
+            req.user.id,
+            'report_submit',
+            `Submitted ${data.type} report`,
+            { report_id: reportId, type: data.type, location: data.location },
+            req
+        );
 
         const [rows] = await pool.execute('SELECT * FROM reports WHERE id = ?', [reportId]);
         res.status(201).json(rows[0]);
@@ -1143,6 +1171,158 @@ app.delete('/api/notifications/clear-read', authenticateToken, async (req, res) 
         res.json({ message: 'Read notifications cleared', count: result.affectedRows });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// ============ REPORT COMMENTS ============
+
+app.get('/api/reports/:id/comments', authenticateToken, async (req, res) => {
+    try {
+        const [comments] = await pool.execute(
+            `SELECT c.*, u.username, u.role,
+                    CASE 
+                        WHEN u.role = 'farmer' THEN CONCAT(f.first_name, ' ', f.last_name)
+                        ELSE u.username
+                    END as author_name
+             FROM report_comments c
+             JOIN users u ON c.user_id = u.id
+             LEFT JOIN farmers f ON u.id = f.user_id
+             WHERE c.report_id = ?
+             ORDER BY c.created_at ASC`,
+            [req.params.id]
+        );
+        res.json(comments);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch comments' });
+    }
+});
+
+app.post('/api/reports/:id/comments', authenticateToken, async (req, res) => {
+    try {
+        const { comment } = req.body;
+        if (!comment || comment.trim().length === 0) {
+            return res.status(400).json({ error: 'Comment cannot be empty' });
+        }
+
+        const isAdmin = req.user.role === 'admin';
+
+        const [result] = await pool.execute(
+            `INSERT INTO report_comments (report_id, user_id, comment, is_admin) VALUES (?, ?, ?, ?)`,
+            [req.params.id, req.user.id, comment.trim(), isAdmin]
+        );
+
+        // Get report details for notification
+        const [reportRows] = await pool.execute('SELECT user_id, type FROM reports WHERE id = ?', [req.params.id]);
+
+        if (reportRows.length > 0) {
+            const report = reportRows[0];
+            // Notify the other party (if admin comments, notify farmer; if farmer comments, notify admin)
+            const notifyUserId = isAdmin ? report.user_id : null; // null means all admins
+
+            if (notifyUserId || !isAdmin) {
+                const title = isAdmin ? 'Admin commented on your report' : 'New farmer comment on report';
+                const message = isAdmin
+                    ? `Admin has added a comment to your ${report.type} report.`
+                    : `Farmer has responded to the ${report.type} report.`;
+
+                if (isAdmin) {
+                    // Notify farmer
+                    await pool.execute(
+                        `INSERT INTO notifications (user_id, type, title, message, reference_id) VALUES (?, 'status_change', ?, ?, ?)`,
+                        [notifyUserId, title, message, req.params.id]
+                    );
+                } else {
+                    // Notify all admins
+                    await pool.execute(
+                        `INSERT INTO notifications (user_id, type, title, message, reference_id)
+                         SELECT id, 'new_report', ?, ?, ? FROM users WHERE role = 'admin'`,
+                        [title, message, req.params.id]
+                    );
+                }
+            }
+        }
+
+        // Log activity
+        await logActivity(
+            req.user.id,
+            'other',
+            `Added comment to report #${req.params.id}`,
+            { report_id: req.params.id, comment_length: comment.length },
+            req
+        );
+
+        res.status(201).json({ id: result.insertId, message: 'Comment added successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to add comment' });
+    }
+});
+
+// ============ ACTIVITY LOGS ============
+
+app.get('/api/activity-logs', authenticateToken, async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = (page - 1) * limit;
+        const actionType = req.query.action_type;
+
+        // Admins can see all logs, farmers only see their own
+        const isAdmin = req.user.role === 'admin';
+        let query = `
+            SELECT a.*, u.username, u.role,
+                   CASE 
+                       WHEN u.role = 'farmer' THEN CONCAT(f.first_name, ' ', f.last_name)
+                       ELSE u.username
+                   END as user_name
+            FROM activity_logs a
+            JOIN users u ON a.user_id = u.id
+            LEFT JOIN farmers f ON u.id = f.user_id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (!isAdmin) {
+            query += ` AND a.user_id = ?`;
+            params.push(req.user.id);
+        }
+
+        if (actionType && actionType !== 'all') {
+            query += ` AND a.action_type = ?`;
+            params.push(actionType);
+        }
+
+        query += ` ORDER BY a.created_at DESC LIMIT ? OFFSET ?`;
+        params.push(limit, offset);
+
+        const [rows] = await pool.execute(query, params);
+
+        // Get total count
+        let countQuery = `SELECT COUNT(*) as total FROM activity_logs WHERE 1=1`;
+        const countParams = [];
+        if (!isAdmin) {
+            countQuery += ` AND user_id = ?`;
+            countParams.push(req.user.id);
+        }
+        if (actionType && actionType !== 'all') {
+            countQuery += ` AND action_type = ?`;
+            countParams.push(actionType);
+        }
+        const [countResult] = await pool.execute(countQuery, countParams);
+
+        res.json({
+            logs: rows,
+            pagination: {
+                page,
+                limit,
+                total: countResult[0].total,
+                totalPages: Math.ceil(countResult[0].total / limit)
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch activity logs' });
     }
 });
 
