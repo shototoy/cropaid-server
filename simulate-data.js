@@ -19,7 +19,54 @@ async function simulate() {
 
     try {
         connection = await mysql.createConnection(dbConfig);
-        const hashedPassword = await bcrypt.hash('password', 10);
+        const hashedPassword = await bcrypt.hash('cropaid123', 10);
+
+        // ==========================================
+        // STATIC DATA INITIALIZATION
+        // ==========================================
+        async function initStaticData() {
+            console.log('   > Initializing Reference Data (Ref Data)...');
+
+            // 1. Pest Categories
+            // Note: We use INSERT IGNORE or ON DUPLICATE UPDATE to avoid errors on re-run
+            // But simple INSERT with cleanup (setup-db drops db) is fine.
+            await connection.execute(`
+                INSERT INTO pest_categories (name, description, severity_level, affected_crops) VALUES
+                ('Rice Black Bug', 'Saps the plant of its nutrients causing it to turn reddish brown or yellow.', 'high', '["Rice"]'),
+                ('Army Worm', 'Larvae feed on leaves and stems, causing massive defoliation.', 'high', '["Rice", "Corn", "Vegetables"]'),
+                ('Rodents', 'Rats that eat crops and grains.', 'medium', '["Rice", "Corn"]')
+            `);
+
+            // 2. Crop Types
+            await connection.execute(`
+                INSERT INTO crop_types (name, description, season) VALUES
+                ('Rice', 'Staple food crop', 'Wet/Dry'),
+                ('Corn', 'Cereal grain', 'Dry'),
+                ('Vegetables', 'Various garden crops', 'Year-round')
+            `);
+
+            // 3. Barangays
+            await connection.execute(`
+                INSERT INTO barangays (name, latitude, longitude) VALUES 
+                ('San Jose', 6.5250, 124.6750),
+                ('Liberty', 6.5050, 124.6550),
+                ('Esperanza', 6.5500, 124.6900),
+                ('Poblacion', 6.5180, 124.6660)
+            `);
+
+            // 4. News & Advisories
+            // Ensure Admin UUID exists (created by seed.sql). 
+            // In case seed.sql failed, we create admin here? No, assuming seed.sql ran.
+            await connection.execute(`
+                INSERT INTO news (title, content, type, priority, created_at, is_active, author_id) VALUES
+                ('Pest Alert: Black Bug Infestation Warning', 'The Municipal Agriculture Office has detected increased black bug activity in several barangays including Poblacion, San Miguel, and Benigno Aquino. Farmers are advised to monitor their rice fields closely and report any signs of infestation immediately.', 'alert', 'high', DATE_SUB(NOW(), INTERVAL 1 DAY), TRUE, 'admin-uuid'),
+                ('Weather Advisory: Dry Season Preparations', 'The Philippine Atmospheric, Geophysical and Astronomical Services Administration (PAGASA) forecasts below-normal rainfall in the coming months. Farmers are encouraged to implement water-saving irrigation techniques and consider drought-resistant crop varieties.', 'advisory', 'medium', DATE_SUB(NOW(), INTERVAL 2 DAY), TRUE, 'admin-uuid'),
+                ('New Seed Distribution Program', 'The Department of Agriculture, in partnership with the local government, will be distributing free certified high-yield rice seeds to all RSBSA-registered farmers. Distribution will be at the Municipal Agriculture Office starting Monday.', 'news', 'low', DATE_SUB(NOW(), INTERVAL 3 DAY), TRUE, 'admin-uuid'),
+                ('Flood Warning: Low-lying Areas', 'PAGASA has issued a flood warning for low-lying areas due to continuous rainfall. Farmers are advised to harvest mature crops if possible and move equipment to higher ground. The CropAid system is ready to receive flood damage reports.', 'alert', 'high', DATE_SUB(NOW(), INTERVAL 4 DAY), TRUE, 'admin-uuid'),
+                ('Free Pest Control Training', 'The Municipal Agriculture Office is conducting a free Integrated Pest Management (IPM) training for farmers. Topics include biological pest control, proper pesticide application, and early detection methods. Register at the MAO office.', 'news', 'low', DATE_SUB(NOW(), INTERVAL 5 DAY), TRUE, 'admin-uuid'),
+                ('Fertilizer Subsidy Application Open', 'The Fertilizer Subsidy Program is now accepting applications. Eligible farmers can receive up to 50% discount on fertilizers. Bring your RSBSA card and valid ID to the Municipal Agriculture Office to apply.', 'news', 'medium', DATE_SUB(NOW(), INTERVAL 6 DAY), TRUE, 'admin-uuid')
+            `);
+        }
 
         // ==========================================
         // HELPER FUNCTIONS
@@ -70,8 +117,6 @@ async function simulate() {
         async function submitReport(user, type, details, location, lat, lon, daysAgo) {
             console.log(`   > Submitting ${type} report for ${user.name}...`);
 
-            // 1. Create Report
-            // Note: Using raw SQL for date math to simulate past reports
             const [res] = await connection.execute(
                 `INSERT INTO reports (user_id, type, status, details, location, latitude, longitude, created_at) 
                  VALUES (?, ?, 'pending', ?, ?, ?, ?, DATE_SUB(NOW(), INTERVAL ? DAY))`,
@@ -79,8 +124,6 @@ async function simulate() {
             );
             const reportId = res.insertId;
 
-            // 2. Create Admin Notification (Mimics server behavior)
-            // Admins get notified of new reports
             await connection.execute(
                 `INSERT INTO notifications (user_id, type, title, message, reference_id, is_read, created_at)
                  VALUES (
@@ -99,14 +142,11 @@ async function simulate() {
         async function verifyReport(reportId, adminNotes, daysAgo) {
             console.log(`   > Verifying report #${reportId}...`);
 
-            // 1. Update Report Status
             await connection.execute(
                 `UPDATE reports SET status = 'verified', admin_notes = ? WHERE id = ?`,
                 [adminNotes, reportId]
             );
 
-            // 2. Notify Farmer (Mimics server behavior)
-            // Get user_id from report
             const [rows] = await connection.execute('SELECT user_id, type FROM reports WHERE id = ?', [reportId]);
             if (rows.length > 0) {
                 const { user_id, type } = rows[0];
@@ -140,6 +180,8 @@ async function simulate() {
         // ==========================================
         // EXECUTION
         // ==========================================
+
+        await initStaticData();
 
         // --- Farmer 1: Shara ---
         const shara = await registerFarmer(

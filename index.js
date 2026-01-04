@@ -98,11 +98,11 @@ const ReportSchema = z.object({
         pestType: z.string().optional(),
         severity: z.string().optional(),
         affectedArea: z.string().optional()
-    }).optional(),
+    }).passthrough().optional(),
     location: z.string().optional(),
-    latitude: z.number().optional(),
-    longitude: z.number().optional(),
-    photoBase64: z.string().optional()
+    latitude: z.number().nullable().optional(),
+    longitude: z.number().nullable().optional(),
+    photoBase64: z.string().nullable().optional()
 });
 
 // ============ MIDDLEWARE ============
@@ -283,75 +283,6 @@ app.get('/api/weather', async (req, res) => {
     }
 });
 
-// ============ NOTIFICATIONS ENDPOINTS ============
-
-app.get('/api/notifications', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const [rows] = await pool.execute(
-            `SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`,
-            [userId]
-        );
-        res.json(rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to fetch notifications' });
-    }
-});
-
-app.get('/api/notifications/unread-count', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const [rows] = await pool.execute(
-            `SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE`,
-            [userId]
-        );
-        res.json({ count: rows[0].count });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to fetch count' });
-    }
-});
-
-app.patch('/api/notifications/:id/read', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const notificationId = req.params.id;
-        await pool.execute(
-            `UPDATE notifications SET is_read = TRUE WHERE id = ? AND user_id = ?`,
-            [notificationId, userId]
-        );
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to update notification' });
-    }
-});
-
-// Polling endpoint for efficient updates
-app.get('/api/polling/stats', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-
-        // Parallel queries for efficiency
-        const [notifRows] = await pool.execute(
-            `SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE`,
-            [userId]
-        );
-        const [reportRows] = await pool.execute(
-            `SELECT COUNT(*) as pending FROM reports WHERE user_id = ? AND status = 'pending'`,
-            [userId]
-        );
-
-        res.json({
-            unread_notifications: notifRows[0].count,
-            active_reports: reportRows[0].pending
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Polling failed' });
-    }
-});
 
 // ============ FARMER ENDPOINTS ============
 
