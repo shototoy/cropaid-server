@@ -154,3 +154,11 @@ INSERT INTO news (title, content, type, priority, created_at, is_active, author_
 ('Free Pest Control Training', 'The Municipal Agriculture Office is conducting a free Integrated Pest Management (IPM) training for farmers. Topics include biological pest control, proper pesticide application, and early detection methods. Register at the MAO office.', 'news', 'low', DATE_SUB(NOW(), INTERVAL 5 DAY), TRUE, 'admin-uuid'),
 ('Fertilizer Subsidy Application Open', 'The Fertilizer Subsidy Program is now accepting applications. Eligible farmers can receive up to 50% discount on fertilizers. Bring your RSBSA card and valid ID to the Municipal Agriculture Office to apply.', 'news', 'medium', DATE_SUB(NOW(), INTERVAL 6 DAY), TRUE, 'admin-uuid');
 
+
+-- =====================
+-- NOTIFICATIONS
+-- =====================
+INSERT INTO notifications (user_id, type, title, message, is_read, created_at) VALUES 
+('shara-uuid', 'status_change', 'Report Verified', 'Your drought report has been verified by the admin.', FALSE, DATE_SUB(NOW(), INTERVAL 9 DAY)),
+('james-uuid', 'status_change', 'Report Resolved', 'Your flood report has been resolved and action has been taken.', TRUE, DATE_SUB(NOW(), INTERVAL 14 DAY));
+

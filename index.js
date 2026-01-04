@@ -281,6 +281,76 @@ app.get('/api/weather', async (req, res) => {
     }
 });
 
+// ============ NOTIFICATIONS ENDPOINTS ============
+
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [rows] = await pool.execute(
+            `SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`,
+            [userId]
+        );
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+});
+
+app.get('/api/notifications/unread-count', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [rows] = await pool.execute(
+            `SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE`,
+            [userId]
+        );
+        res.json({ count: rows[0].count });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch count' });
+    }
+});
+
+app.patch('/api/notifications/:id/read', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const notificationId = req.params.id;
+        await pool.execute(
+            `UPDATE notifications SET is_read = TRUE WHERE id = ? AND user_id = ?`,
+            [notificationId, userId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update notification' });
+    }
+});
+
+// Polling endpoint for efficient updates
+app.get('/api/polling/stats', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Parallel queries for efficiency
+        const [notifRows] = await pool.execute(
+            `SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE`,
+            [userId]
+        );
+        const [reportRows] = await pool.execute(
+            `SELECT COUNT(*) as pending FROM reports WHERE user_id = ? AND status = 'pending'`,
+            [userId]
+        );
+
+        res.json({
+            unread_notifications: notifRows[0].count,
+            active_reports: reportRows[0].pending
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Polling failed' });
+    }
+});
+
 // ============ FARMER ENDPOINTS ============
 
 app.get('/api/farmer/me', authenticateToken, async (req, res) => {
@@ -1022,30 +1092,34 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
     try {
         const [rows] = await pool.execute(
             `SELECT * FROM notifications 
-             WHERE user_id = ? OR (user_id IS NULL AND ? = 'admin')
+             WHERE user_id = ? OR user_id IS NULL
              ORDER BY created_at DESC LIMIT 50`,
-            [req.user.id, req.user.role]
+            [req.user.id]
         );
         const [unreadCount] = await pool.execute(
             `SELECT COUNT(*) as count FROM notifications 
-             WHERE (user_id = ? OR (user_id IS NULL AND ? = 'admin')) AND is_read = FALSE`,
-            [req.user.id, req.user.role]
+             WHERE (user_id = ? OR user_id IS NULL) AND is_read = FALSE`,
+            [req.user.id]
         );
-        res.json({ notifications: rows, unreadCount: unreadCount[0].count });
+        res.json({
+            notifications: rows,
+            unreadCount: unreadCount[0].count
+        });
     } catch (err) {
-        res.json({ notifications: [], unreadCount: 0 });
+        console.error(err);
+        res.status(500).json({ error: 'Failed' });
     }
 });
 
 app.get('/api/notifications/unread-count', authenticateToken, async (req, res) => {
     try {
         const since = req.query.since;
-        let query = `SELECT COUNT(*) as count FROM notifications 
-                     WHERE (user_id = ? OR (user_id IS NULL AND ? = 'admin')) AND is_read = FALSE`;
+        let query = `SELECT COUNT(*) as count FROM notifications
+        WHERE(user_id = ? OR(user_id IS NULL AND ? = 'admin')) AND is_read = FALSE`;
         const params = [req.user.id, req.user.role];
 
         if (since) {
-            query += ` AND created_at > ?`;
+            query += ` AND created_at > ? `;
             params.push(since);
         }
 
@@ -1089,7 +1163,7 @@ app.post('/api/admin/pest-categories', authenticateToken, requireAdmin, async (r
     try {
         const { name, description, severityLevel, affectedCrops } = req.body;
         const [result] = await pool.execute(
-            `INSERT INTO pest_categories (name, description, severity_level, affected_crops) VALUES (?, ?, ?, ?)`,
+            `INSERT INTO pest_categories(name, description, severity_level, affected_crops) VALUES(?, ?, ?, ?)`,
             [name, description, severityLevel || 'medium', affectedCrops]
         );
         res.status(201).json({ id: result.insertId, message: 'Pest category created' });
@@ -1102,7 +1176,7 @@ app.put('/api/admin/pest-categories/:id', authenticateToken, requireAdmin, async
     try {
         const { name, description, severityLevel, affectedCrops, isActive } = req.body;
         await pool.execute(
-            `UPDATE pest_categories SET name = ?, description = ?, severity_level = ?, affected_crops = ?, is_active = ? WHERE id = ?`,
+            `UPDATE pest_categories SET name = ?, description = ?, severity_level = ?, affected_crops = ?, is_active = ? WHERE id = ? `,
             [name, description, severityLevel, affectedCrops, isActive, req.params.id]
         );
         res.json({ message: 'Pest category updated' });
@@ -1132,7 +1206,7 @@ app.get('/api/admin/crop-types', authenticateToken, requireAdmin, async (req, re
 app.post('/api/admin/crop-types', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { name, description, season } = req.body;
-        const [result] = await pool.execute(`INSERT INTO crop_types (name, description, season) VALUES (?, ?, ?)`, [name, description, season]);
+        const [result] = await pool.execute(`INSERT INTO crop_types(name, description, season) VALUES(?, ?, ?)`, [name, description, season]);
         res.status(201).json({ id: result.insertId, message: 'Crop type created' });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
@@ -1142,7 +1216,7 @@ app.post('/api/admin/crop-types', authenticateToken, requireAdmin, async (req, r
 app.put('/api/admin/crop-types/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { name, description, season, isActive } = req.body;
-        await pool.execute(`UPDATE crop_types SET name = ?, description = ?, season = ?, is_active = ? WHERE id = ?`, [name, description, season, isActive, req.params.id]);
+        await pool.execute(`UPDATE crop_types SET name = ?, description = ?, season = ?, is_active = ? WHERE id = ? `, [name, description, season, isActive, req.params.id]);
         res.json({ message: 'Crop type updated' });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
@@ -1171,7 +1245,7 @@ app.post('/api/admin/barangays', authenticateToken, requireAdmin, async (req, re
     try {
         const { name, municipality, province, latitude, longitude } = req.body;
         const [result] = await pool.execute(
-            `INSERT INTO barangays (name, municipality, province, latitude, longitude) VALUES (?, ?, ?, ?, ?)`,
+            `INSERT INTO barangays(name, municipality, province, latitude, longitude) VALUES(?, ?, ?, ?, ?)`,
             [name, municipality || 'Norala', province || 'South Cotabato', latitude, longitude]
         );
         res.status(201).json({ id: result.insertId, message: 'Barangay created' });
@@ -1196,7 +1270,7 @@ app.put('/api/admin/settings', authenticateToken, requireAdmin, async (req, res)
         const settings = req.body;
         for (const [key, value] of Object.entries(settings)) {
             await pool.execute(
-                `INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?`,
+                `INSERT INTO system_settings(setting_key, setting_value) VALUES(?, ?) ON DUPLICATE KEY UPDATE setting_value = ? `,
                 [key, value, value]
             );
         }
@@ -1220,7 +1294,7 @@ app.post('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =
         const { username, email, password, role } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
         const id = randomUUID();
-        await pool.execute(`INSERT INTO users (id, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)`, [id, username, email, hashedPassword, role || 'admin']);
+        await pool.execute(`INSERT INTO users(id, username, email, password_hash, role) VALUES(?, ?, ?, ?, ?)`, [id, username, email, hashedPassword, role || 'admin']);
         res.status(201).json({ id, message: 'User created' });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -1305,18 +1379,18 @@ app.get('/api/crop-types', async (req, res) => {
 const ensureNewsTable = async () => {
     try {
         await pool.execute(`
-            CREATE TABLE IF NOT EXISTS news (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                title VARCHAR(255) NOT NULL,
-                content TEXT NOT NULL,
-                type ENUM('news', 'advisory', 'weather', 'alert') DEFAULT 'news',
-                priority ENUM('low', 'normal', 'medium', 'high', 'critical') DEFAULT 'normal',
-                author_id CHAR(36),
-                is_active BOOLEAN DEFAULT TRUE,
-                expires_at TIMESTAMP NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            )
+            CREATE TABLE IF NOT EXISTS news(
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            content TEXT NOT NULL,
+            type ENUM('news', 'advisory', 'weather', 'alert') DEFAULT 'news',
+            priority ENUM('low', 'normal', 'medium', 'high', 'critical') DEFAULT 'normal',
+            author_id CHAR(36),
+            is_active BOOLEAN DEFAULT TRUE,
+            expires_at TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
         `);
         // console.log("News table verified");
     } catch (err) {
@@ -1343,15 +1417,6 @@ app.post('/api/admin/news', authenticateToken, requireAdmin, async (req, res) =>
             'INSERT INTO news (title, content, type, priority, author_id, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
             [title, content, type || 'news', priority || 'normal', req.user.id, expiresAt || null]
         );
-
-        // Create notification for all users if it's an important advisory
-        if (type === 'advisory' || type === 'alert' || priority === 'critical') {
-            await pool.execute(
-                `INSERT INTO notifications (type, title, message, reference_id) 
-                 VALUES (?, ?, ?, ?)`,
-                ['advisory', title, content.substring(0, 100) + '...', result.insertId]
-            );
-        }
 
         res.status(201).json({ id: result.insertId, message: 'News item created' });
     } catch (err) {
@@ -1382,6 +1447,6 @@ app.get('*', (req, res) => {
 // ============ START SERVER ============
 
 app.listen(PORT, () => {
-    console.log(`CropAid Server running on port ${PORT}`);
+    console.log(`CropAid Server running on port ${PORT} `);
     console.log(`Health check: http://localhost:${PORT}/api/health`);
 });
