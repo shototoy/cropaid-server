@@ -32,7 +32,8 @@ const corsOptions = {
         'capacitor://localhost',
         'https://localhost',
         'ionic://localhost',
-        'http://localhost'
+        'http://localhost',
+        'https://shototoy.github.io/CropAid/'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -42,8 +43,9 @@ const corsOptions = {
 // Increase payload limit for Base64 images
 app.use(cors(corsOptions));
 app.use(helmet({
-    contentSecurityPolicy: false, // Disable CSP for serving frontend
-    crossOriginEmbedderPolicy: false
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -747,7 +749,8 @@ app.post('/api/admin/farmers', authenticateToken, requireAdmin, async (req, res)
         const {
             firstName, lastName, middleName, email, cellphone,
             rsbsaId, barangay, municipality, province,
-            farmBarangay, farmSize
+            farmBarangay, farmSize,
+            username: providedUsername, password: providedPassword
         } = req.body;
 
         // Validate required fields
@@ -761,15 +764,17 @@ app.post('/api/admin/farmers', authenticateToken, requireAdmin, async (req, res)
             return res.status(400).json({ error: 'RSBSA ID already registered' });
         }
 
-        // Create user account with default password
+        // Create user account
         const userId = randomUUID();
-        const username = `${firstName.toLowerCase()}.${lastName.toLowerCase()}`.replace(/\s/g, '');
-        const defaultPassword = await bcrypt.hash('cropaid123', 10);
+        // Use provided username or auto-generate (though frontend requires it)
+        const username = providedUsername || `${firstName.toLowerCase()}.${lastName.toLowerCase()}`.replace(/\s/g, '');
+        const passwordToHash = providedPassword || 'cropaid123';
+        const hashedPassword = await bcrypt.hash(passwordToHash, 10);
 
         await pool.execute(
             `INSERT INTO users (id, email, username, password_hash, role, is_active)
              VALUES (?, ?, ?, ?, 'farmer', TRUE)`,
-            [userId, email || `${username}@cropaid.local`, username, defaultPassword]
+            [userId, email || `${username}@cropaid.local`, username, hashedPassword]
         );
 
         // Create farmer profile
