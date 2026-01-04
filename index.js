@@ -56,20 +56,30 @@ app.use(express.static(distPath));
 
 // ============ VALIDATION SCHEMAS ============
 
+// Custom validators
+const philippinePhoneRegex = /^(09|\+639)\d{9}$/;
+const philippineCoordinates = z.object({
+    latitude: z.number().min(4.5).max(21.5), // Philippines latitude bounds
+    longitude: z.number().min(116).max(127)  // Philippines longitude bounds
+});
+
 const RegisterSchema = z.object({
-    email: z.string().email(),
-    username: z.string().min(3),
-    password: z.string().min(6),
-    rsbsaId: z.string().min(5),
-    firstName: z.string().min(1),
-    lastName: z.string().min(1),
+    email: z.string().email('Invalid email format'),
+    username: z.string().min(3, 'Username must be at least 3 characters'),
+    password: z.string().min(6, 'Password must be at least 6 characters'),
+    rsbsaId: z.string().min(5, 'RSBSA ID must be at least 5 characters'),
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
     middleName: z.string().optional(),
     tribe: z.string().optional(),
     streetSitio: z.string().optional(),
     barangay: z.string().optional(),
     municipality: z.string().optional(),
     province: z.string().optional(),
-    cellphone: z.string().optional(),
+    cellphone: z.string()
+        .regex(philippinePhoneRegex, 'Invalid Philippine phone number format (e.g., 09171234567)')
+        .optional()
+        .or(z.literal('')),
     sex: z.enum(['Male', 'Female']).optional(),
     dobMonth: z.string().optional(),
     dobDay: z.string().optional(),
@@ -79,8 +89,16 @@ const RegisterSchema = z.object({
     farmBarangay: z.string().optional(),
     farmMunicipality: z.string().optional(),
     farmProvince: z.string().optional(),
-    farmLatitude: z.number().nullable().optional(),
-    farmLongitude: z.number().nullable().optional(),
+    farmLatitude: z.number()
+        .min(4.5, 'Latitude must be within Philippines')
+        .max(21.5, 'Latitude must be within Philippines')
+        .nullable()
+        .optional(),
+    farmLongitude: z.number()
+        .min(116, 'Longitude must be within Philippines')
+        .max(127, 'Longitude must be within Philippines')
+        .nullable()
+        .optional(),
     farmSize: z.string().optional()
 });
 
@@ -100,8 +118,16 @@ const ReportSchema = z.object({
         affectedArea: z.string().optional()
     }).passthrough().optional(),
     location: z.string().optional(),
-    latitude: z.number().nullable().optional(),
-    longitude: z.number().nullable().optional(),
+    latitude: z.number()
+        .min(4.5, 'Latitude must be within Philippines')
+        .max(21.5, 'Latitude must be within Philippines')
+        .nullable()
+        .optional(),
+    longitude: z.number()
+        .min(116, 'Longitude must be within Philippines')
+        .max(127, 'Longitude must be within Philippines')
+        .nullable()
+        .optional(),
     photoBase64: z.string().nullable().optional()
 });
 
@@ -457,6 +483,18 @@ app.patch('/api/farmer/profile', authenticateToken, async (req, res) => {
 app.post('/api/reports', authenticateToken, async (req, res) => {
     try {
         const data = ReportSchema.parse(req.body);
+
+        // Validate photo size (max 10MB)
+        if (data.photoBase64) {
+            const photoSizeInBytes = Buffer.from(data.photoBase64.split(',')[1] || data.photoBase64, 'base64').length;
+            const photoSizeInMB = photoSizeInBytes / (1024 * 1024);
+
+            if (photoSizeInMB > 10) {
+                return res.status(400).json({
+                    error: `Photo size (${photoSizeInMB.toFixed(2)}MB) exceeds the 10MB limit. Please compress the image or use a smaller photo.`
+                });
+            }
+        }
 
         const [result] = await pool.execute(
             `INSERT INTO reports (user_id, type, details, location, latitude, longitude, photo_base64)

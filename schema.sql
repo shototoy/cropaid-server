@@ -183,13 +183,47 @@ CREATE TABLE IF NOT EXISTS news (
 );
 
 -- =====================
--- INDEXES
+-- INDEXES FOR PERFORMANCE OPTIMIZATION
 -- =====================
+
+-- User & Authentication indexes
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_is_active ON users(is_active);
+
+-- Farmer indexes
 CREATE INDEX idx_farmers_user_id ON farmers(user_id);
+CREATE INDEX idx_farmers_rsbsa_id ON farmers(rsbsa_id);
 CREATE INDEX idx_farmers_barangay ON farmers(address_barangay);
+CREATE INDEX idx_farmers_name ON farmers(last_name, first_name);
+
+-- Farm indexes
 CREATE INDEX idx_farms_farmer_id ON farms(farmer_id);
+CREATE INDEX idx_farms_barangay ON farms(location_barangay);
+CREATE INDEX idx_farms_coordinates ON farms(latitude, longitude);
+
+-- Report indexes (most frequently queried)
 CREATE INDEX idx_reports_user_id ON reports(user_id);
 CREATE INDEX idx_reports_status ON reports(status);
 CREATE INDEX idx_reports_type ON reports(type);
-CREATE INDEX idx_reports_created_at ON reports(created_at);
+CREATE INDEX idx_reports_created_at ON reports(created_at DESC);
+CREATE INDEX idx_reports_location ON reports(location);
+CREATE INDEX idx_reports_coordinates ON reports(latitude, longitude);
+-- Composite indexes for common query patterns
+CREATE INDEX idx_reports_status_type ON reports(status, type);
+CREATE INDEX idx_reports_status_created ON reports(status, created_at DESC);
+CREATE INDEX idx_reports_user_status ON reports(user_id, status);
+
+-- Notification indexes
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX idx_notifications_type ON notifications(type);
+-- Composite index for unread notifications query
+CREATE INDEX idx_notifications_user_read ON notifications(user_id, is_read);
+
+-- News indexes
+CREATE INDEX idx_news_is_active ON news(is_active);
+CREATE INDEX idx_news_type ON news(type);
+CREATE INDEX idx_news_created_at ON news(created_at DESC);
+CREATE INDEX idx_news_active_created ON news(is_active, created_at DESC);
