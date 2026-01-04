@@ -173,7 +173,7 @@ CREATE TABLE IF NOT EXISTS news (
     title VARCHAR(255) NOT NULL,
     content TEXT,
     type ENUM('news', 'advisory', 'weather', 'alert') DEFAULT 'news',
-    priority ENUM('normal', 'high', 'critical') DEFAULT 'normal',
+    priority ENUM('low', 'normal', 'medium', 'high', 'critical') DEFAULT 'normal',
     author_id CHAR(36),
     is_active BOOLEAN DEFAULT TRUE,
     expires_at TIMESTAMP NULL,
