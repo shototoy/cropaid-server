@@ -19,7 +19,7 @@ async function simulate() {
 
     try {
         connection = await mysql.createConnection(dbConfig);
-        const hashedPassword = await bcrypt.hash('cropaid123', 10);
+        const hashedPassword = await bcrypt.hash('password', 10);
 
         // ==========================================
         // STATIC DATA INITIALIZATION
