@@ -166,6 +166,23 @@ CREATE TABLE IF NOT EXISTS system_settings (
 );
 
 -- =====================
+-- NEWS TABLE
+-- =====================
+CREATE TABLE IF NOT EXISTS news (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    content TEXT,
+    type ENUM('news', 'advisory', 'weather', 'alert') DEFAULT 'news',
+    priority ENUM('normal', 'high', 'critical') DEFAULT 'normal',
+    author_id CHAR(36),
+    is_active BOOLEAN DEFAULT TRUE,
+    expires_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- =====================
 -- INDEXES
 -- =====================
 CREATE INDEX idx_farmers_user_id ON farmers(user_id);
