@@ -19,12 +19,7 @@ const pool = mysql.createPool(process.env.DATABASE_URL || {
     database: process.env.DB_NAME || 'cropaid',
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0,
-    connectTimeout: 60000,
-    acquireTimeout: 60000,
-    timeout: 60000,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 0
+    queueLimit: 0
 });
 export const query = async (sql, params) => {
     const [results,] = await pool.execute(sql, params);
