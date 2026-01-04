@@ -1299,6 +1299,76 @@ app.get('/api/crop-types', async (req, res) => {
     ]);
 });
 
+// ============ NEWS & ADVISORIES ============
+
+// Ensure table exists (Auto-Migration)
+const ensureNewsTable = async () => {
+    try {
+        await pool.execute(`
+            CREATE TABLE IF NOT EXISTS news (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                content TEXT NOT NULL,
+                type ENUM('news', 'advisory', 'weather', 'alert') DEFAULT 'news',
+                priority ENUM('normal', 'high', 'critical') DEFAULT 'normal',
+                author_id CHAR(36),
+                is_active BOOLEAN DEFAULT TRUE,
+                expires_at TIMESTAMP NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        `);
+        // console.log("News table verified");
+    } catch (err) {
+        console.error("Error checking news table:", err);
+    }
+};
+ensureNewsTable();
+
+app.get('/api/news', authenticateToken, async (req, res) => {
+    try {
+        const [rows] = await pool.execute(
+            'SELECT * FROM news WHERE is_active = TRUE ORDER BY created_at DESC LIMIT 50'
+        );
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.post('/api/admin/news', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { title, content, type, priority, expiresAt } = req.body;
+        const [result] = await pool.execute(
+            'INSERT INTO news (title, content, type, priority, author_id, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [title, content, type || 'news', priority || 'normal', req.user.id, expiresAt || null]
+        );
+
+        // Create notification for all users if it's an important advisory
+        if (type === 'advisory' || type === 'alert' || priority === 'critical') {
+            await pool.execute(
+                `INSERT INTO notifications (type, title, message, reference_id) 
+                 VALUES (?, ?, ?, ?)`,
+                ['advisory', title, content.substring(0, 100) + '...', result.insertId]
+            );
+        }
+
+        res.status(201).json({ id: result.insertId, message: 'News item created' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.delete('/api/admin/news/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        await pool.execute('DELETE FROM news WHERE id = ?', [req.params.id]);
+        res.json({ message: 'News item deleted' });
+    } catch (err) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // ============ SPA FALLBACK - Serve frontend for non-API routes ============
 app.get('*', (req, res) => {
     // Only serve index.html for non-API routes
