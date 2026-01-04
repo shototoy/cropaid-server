@@ -25,7 +25,15 @@ const WEATHER_API_KEY = process.env.WEATHER_API_KEY || '';
 // CORS configuration for separate frontend/backend hosting
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const corsOptions = {
-    origin: [FRONTEND_URL, 'http://localhost:5173', 'http://localhost:3000'],
+    origin: [
+        FRONTEND_URL,
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'capacitor://localhost',
+        'https://localhost',
+        'ionic://localhost',
+        'http://localhost'
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
