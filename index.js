@@ -547,7 +547,7 @@ app.post('/api/reports', authenticateToken, async (req, res) => {
                 `INSERT INTO notifications (user_id, type, title, message, reference_id)
                  SELECT id, 'new_report', ?, ?, ?
                  FROM users WHERE role = 'admin'`,
-                [`New ${data.type} report`, `A new ${data.type} report has been submitted`, reportId.toString()]
+                [`New Report from ${req.user.name}`, `${req.user.name} filed a ${data.type} report.`, reportId.toString()]
             );
         } catch (e) { /* notifications table might not exist */ }
 
