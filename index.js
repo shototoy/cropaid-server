@@ -428,7 +428,7 @@ app.patch('/api/farmer/profile', authenticateToken, async (req, res) => {
     let connection;
     try {
         const userId = req.user.id;
-        const { cellphone, address_barangay, farm_latitude, farm_longitude, profile_picture } = req.body;
+        const { cellphone, address_barangay, farm_latitude, farm_longitude, profile_picture, farm_sitio, farm_barangay, farm_size_hectares } = req.body;
 
         connection = await pool.getConnection();
         await connection.beginTransaction();
@@ -472,7 +472,7 @@ app.patch('/api/farmer/profile', authenticateToken, async (req, res) => {
         }
 
         // Update farm table (location)
-        if (farm_latitude !== undefined || farm_longitude !== undefined) {
+        if (farm_latitude !== undefined || farm_longitude !== undefined || farm_sitio !== undefined || farm_barangay !== undefined || farm_size_hectares !== undefined) {
             const farmUpdates = [];
             const farmParams = [];
 
@@ -483,6 +483,18 @@ app.patch('/api/farmer/profile', authenticateToken, async (req, res) => {
             if (farm_longitude !== undefined) {
                 farmUpdates.push('longitude = ?');
                 farmParams.push(farm_longitude);
+            }
+            if (farm_sitio !== undefined) {
+                farmUpdates.push('location_sitio = ?');
+                farmParams.push(farm_sitio);
+            }
+            if (farm_barangay !== undefined) {
+                farmUpdates.push('location_barangay = ?');
+                farmParams.push(farm_barangay);
+            }
+            if (farm_size_hectares !== undefined) {
+                farmUpdates.push('farm_size_hectares = ?');
+                farmParams.push(farm_size_hectares);
             }
 
             if (farmUpdates.length > 0) {
@@ -502,6 +514,31 @@ app.patch('/api/farmer/profile', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Failed to update profile' });
     } finally {
         if (connection) connection.release();
+    }
+});
+
+// Get public reports for community map
+app.get('/api/public/reports', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        // Fetch all verified reports OR my reports (even if pending)
+        const [rows] = await pool.execute(
+            `SELECT 
+                r.id, r.type, r.status, r.location, r.latitude, r.longitude, 
+                r.details, r.created_at, r.user_id,
+                f.first_name, f.last_name
+             FROM reports r
+             JOIN farmers f ON r.user_id = f.user_id
+             WHERE 
+                (r.status = 'verified' OR r.status = 'resolved') 
+                OR r.user_id = ?
+             ORDER BY r.created_at DESC`,
+            [userId]
+        );
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
