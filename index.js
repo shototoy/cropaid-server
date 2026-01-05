@@ -1630,6 +1630,190 @@ app.delete('/api/admin/news/:id', authenticateToken, requireAdmin, async (req, r
     }
 });
 
+// ============ ADMIN SETTINGS ENDPOINTS ============
+
+app.get('/api/admin/pest-categories', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const [rows] = await pool.execute('SELECT * FROM pest_categories ORDER BY name ASC');
+        res.json({ categories: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.post('/api/admin/pest-categories', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { name, description } = req.body;
+        const [result] = await pool.execute(
+            'INSERT INTO pest_categories (name, description) VALUES (?, ?)',
+            [name, description || null]
+        );
+        res.status(201).json({ id: result.insertId, message: 'Pest category created' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.put('/api/admin/pest-categories/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { name, description } = req.body;
+        await pool.execute(
+            'UPDATE pest_categories SET name = ?, description = ? WHERE id = ?',
+            [name, description || null, req.params.id]
+        );
+        res.json({ message: 'Pest category updated' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.delete('/api/admin/pest-categories/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        await pool.execute('DELETE FROM pest_categories WHERE id = ?', [req.params.id]);
+        res.json({ message: 'Pest category deleted' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.get('/api/admin/crop-types', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const [rows] = await pool.execute('SELECT * FROM crop_types ORDER BY name ASC');
+        res.json({ cropTypes: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.post('/api/admin/crop-types', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { name, variety, description } = req.body;
+        const [result] = await pool.execute(
+            'INSERT INTO crop_types (name, variety, description) VALUES (?, ?, ?)',
+            [name, variety || null, description || null]
+        );
+        res.status(201).json({ id: result.insertId, message: 'Crop type created' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.put('/api/admin/crop-types/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { name, variety, description } = req.body;
+        await pool.execute(
+            'UPDATE crop_types SET name = ?, variety = ?, description = ? WHERE id = ?',
+            [name, variety || null, description || null, req.params.id]
+        );
+        res.json({ message: 'Crop type updated' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.delete('/api/admin/crop-types/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        await pool.execute('DELETE FROM crop_types WHERE id = ?', [req.params.id]);
+        res.json({ message: 'Crop type deleted' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.get('/api/admin/barangays', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const [rows] = await pool.execute('SELECT * FROM barangays ORDER BY name ASC');
+        res.json({ barangays: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.post('/api/admin/barangays', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { name, municipality, province } = req.body;
+        const [result] = await pool.execute(
+            'INSERT INTO barangays (name, municipality, province) VALUES (?, ?, ?)',
+            [name, municipality || 'Norala', province || 'South Cotabato']
+        );
+        res.status(201).json({ id: result.insertId, message: 'Barangay created' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.put('/api/admin/barangays/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { name, municipality, province } = req.body;
+        await pool.execute(
+            'UPDATE barangays SET name = ?, municipality = ?, province = ? WHERE id = ?',
+            [name, municipality || 'Norala', province || 'South Cotabato', req.params.id]
+        );
+        res.json({ message: 'Barangay updated' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.delete('/api/admin/barangays/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        await pool.execute('DELETE FROM barangays WHERE id = ?', [req.params.id]);
+        res.json({ message: 'Barangay deleted' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const [rows] = await pool.execute(`
+            SELECT u.id, u.username, u.email, u.role, u.is_active, u.created_at
+            FROM users u
+            ORDER BY u.created_at DESC
+        `);
+        res.json({ users: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.put('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { username, email } = req.body;
+        await pool.execute(
+            'UPDATE users SET username = ?, email = ? WHERE id = ?',
+            [username, email, req.params.id]
+        );
+        res.json({ message: 'User updated' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        await pool.execute('DELETE FROM users WHERE id = ?', [req.params.id]);
+        res.json({ message: 'User deleted' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // ============ SPA FALLBACK - Serve frontend for non-API routes ============
 app.get('*', (req, res) => {
     // Only serve index.html for non-API routes

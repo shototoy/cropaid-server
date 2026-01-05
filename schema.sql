@@ -13,7 +13,6 @@ DROP TABLE IF EXISTS pest_categories;
 DROP TABLE IF EXISTS crop_types;
 DROP TABLE IF EXISTS barangays;
 DROP TABLE IF EXISTS news;
-DROP TABLE IF EXISTS system_settings;
 
 -- =====================
 -- USERS TABLE
@@ -181,17 +180,6 @@ CREATE TABLE IF NOT EXISTS barangays (
     latitude DECIMAL(10, 8),
     longitude DECIMAL(11, 8),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- =====================
--- SYSTEM SETTINGS TABLE
--- =====================
-CREATE TABLE IF NOT EXISTS system_settings (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    setting_key VARCHAR(100) UNIQUE NOT NULL,
-    setting_value TEXT,
-    description TEXT,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- =====================
