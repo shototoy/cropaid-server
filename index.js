@@ -433,8 +433,14 @@ app.get('/api/farmer/farms', authenticateToken, async (req, res) => {
                 fm.id,
                 fm.latitude as lat, 
                 fm.longitude as lng, 
-                fm.location_barangay as barangay, 
-                fm.farm_size_hectares as size
+                fm.location_barangay as barangay,
+                fm.location_sitio, 
+                fm.farm_size_hectares as size,
+                fm.planting_method, fm.date_of_sowing, fm.date_of_transplanting, fm.date_of_harvest,
+                fm.land_category, fm.soil_type, fm.topography, fm.irrigation_source, fm.tenural_status,
+                fm.boundary_north, fm.boundary_south, fm.boundary_east, fm.boundary_west,
+                fm.current_crop, fm.cover_type, fm.amount_cover, fm.insurance_premium,
+                fm.cltip_sum_insured, fm.cltip_premium
              FROM farmers f
              JOIN farms fm ON f.id = fm.farmer_id
              WHERE f.user_id = ?`,
@@ -445,8 +451,10 @@ app.get('/api/farmer/farms', authenticateToken, async (req, res) => {
             id: r.id,
             lat: r.lat ? parseFloat(r.lat) : null,
             lng: r.lng ? parseFloat(r.lng) : null,
-            barangay: r.barangay,
-            size: r.size
+            location_barangay: r.barangay, // alias for UI consistency
+            location_sitio: r.location_sitio,
+            farm_size_hectares: r.size,
+            ...r // spread other fields
         })));
     } catch (err) {
         console.error(err);
@@ -458,7 +466,14 @@ app.get('/api/farmer/farms', authenticateToken, async (req, res) => {
 app.post('/api/farmer/farm', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { lat, lng, barangay, size } = req.body;
+        const {
+            lat, lng, location_barangay, location_sitio, farm_size_hectares,
+            planting_method, date_of_sowing, date_of_transplanting, date_of_harvest,
+            land_category, soil_type, topography, irrigation_source, tenural_status,
+            boundary_north, boundary_south, boundary_east, boundary_west,
+            current_crop, cover_type, amount_cover, insurance_premium,
+            cltip_sum_insured, cltip_premium
+        } = req.body;
 
         // Get farmer ID
         const [farmers] = await pool.execute('SELECT id FROM farmers WHERE user_id = ?', [userId]);
@@ -466,9 +481,22 @@ app.post('/api/farmer/farm', authenticateToken, async (req, res) => {
         const farmerId = farmers[0].id;
 
         const [result] = await pool.execute(
-            `INSERT INTO farms (farmer_id, latitude, longitude, location_barangay, farm_size_hectares)
-             VALUES (?, ?, ?, ?, ?)`,
-            [farmerId, lat, lng, barangay, size]
+            `INSERT INTO farms (
+                farmer_id, latitude, longitude, location_barangay, location_sitio, farm_size_hectares,
+                planting_method, date_of_sowing, date_of_transplanting, date_of_harvest,
+                land_category, soil_type, topography, irrigation_source, tenural_status,
+                boundary_north, boundary_south, boundary_east, boundary_west,
+                current_crop, cover_type, amount_cover, insurance_premium,
+                cltip_sum_insured, cltip_premium
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                farmerId, lat, lng, location_barangay, location_sitio, farm_size_hectares,
+                planting_method || null, date_of_sowing || null, date_of_transplanting || null, date_of_harvest || null,
+                land_category || null, soil_type || null, topography || null, irrigation_source || null, tenural_status || null,
+                boundary_north || null, boundary_south || null, boundary_east || null, boundary_west || null,
+                current_crop || null, cover_type || null, amount_cover || null, insurance_premium || null,
+                cltip_sum_insured || null, cltip_premium || null
+            ]
         );
 
         res.status(201).json({
@@ -487,7 +515,14 @@ app.put('/api/farmer/farm/:id', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const farmId = req.params.id;
-        const { lat, lng, barangay, size } = req.body;
+        const {
+            lat, lng, location_barangay, location_sitio, farm_size_hectares,
+            planting_method, date_of_sowing, date_of_transplanting, date_of_harvest,
+            land_category, soil_type, topography, irrigation_source, tenural_status,
+            boundary_north, boundary_south, boundary_east, boundary_west,
+            current_crop, cover_type, amount_cover, insurance_premium,
+            cltip_sum_insured, cltip_premium
+        } = req.body;
 
         // Verify ownership
         const [rows] = await pool.execute(
@@ -499,8 +534,23 @@ app.put('/api/farmer/farm/:id', authenticateToken, async (req, res) => {
         if (rows.length === 0) return res.status(403).json({ error: 'Not authorized to edit this farm' });
 
         await pool.execute(
-            `UPDATE farms SET latitude = ?, longitude = ?, location_barangay = ?, farm_size_hectares = ? WHERE id = ?`,
-            [lat, lng, barangay, size, farmId]
+            `UPDATE farms SET 
+                latitude = ?, longitude = ?, location_barangay = ?, location_sitio = ?, farm_size_hectares = ?,
+                planting_method = ?, date_of_sowing = ?, date_of_transplanting = ?, date_of_harvest = ?,
+                land_category = ?, soil_type = ?, topography = ?, irrigation_source = ?, tenural_status = ?,
+                boundary_north = ?, boundary_south = ?, boundary_east = ?, boundary_west = ?,
+                current_crop = ?, cover_type = ?, amount_cover = ?, insurance_premium = ?,
+                cltip_sum_insured = ?, cltip_premium = ?
+             WHERE id = ?`,
+            [
+                lat, lng, location_barangay, location_sitio, farm_size_hectares,
+                planting_method || null, date_of_sowing || null, date_of_transplanting || null, date_of_harvest || null,
+                land_category || null, soil_type || null, topography || null, irrigation_source || null, tenural_status || null,
+                boundary_north || null, boundary_south || null, boundary_east || null, boundary_west || null,
+                current_crop || null, cover_type || null, amount_cover || null, insurance_premium || null,
+                cltip_sum_insured || null, cltip_premium || null,
+                farmId
+            ]
         );
 
         res.json({ message: 'Farm updated successfully' });
