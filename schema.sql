@@ -4,15 +4,17 @@
 -- =====================
 -- DROP TABLES (in reverse order of creation due to foreign keys)
 -- =====================
+DROP TABLE IF EXISTS activity_logs;
+DROP TABLE IF EXISTS report_comments;
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS reports;
 DROP TABLE IF EXISTS farms;
 DROP TABLE IF EXISTS farmers;
+DROP TABLE IF EXISTS news;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS pest_categories;
 DROP TABLE IF EXISTS crop_types;
 DROP TABLE IF EXISTS barangays;
-DROP TABLE IF EXISTS news;
 
 -- =====================
 -- USERS TABLE

@@ -320,6 +320,7 @@ async function simulate() {
 
         let counter = 1;
         for (const barangay of remainingBarangays) {
+            console.log(`   > [${counter}/${remainingBarangays.length}] Creating community farmer for ${barangay}...`);
             const center = barangayCenters[barangay];
             // Create a generic farmer for this barangay
             const farmerName = `Farmer ${barangay.replace(/[^a-zA-Z]/g, '')}`;
