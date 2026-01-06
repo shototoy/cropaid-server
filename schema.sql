@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS farms (
 CREATE TABLE IF NOT EXISTS reports (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id CHAR(36) NOT NULL,
+    farm_id INT, -- Optional link to specific farm
     type ENUM('pest', 'flood', 'drought') NOT NULL,
     status ENUM('pending', 'verified', 'resolved', 'rejected') DEFAULT 'pending',
     location VARCHAR(255),
@@ -118,7 +119,8 @@ CREATE TABLE IF NOT EXISTS reports (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (verified_by) REFERENCES users(id) ON DELETE SET NULL
+    FOREIGN KEY (verified_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (farm_id) REFERENCES farms(id) ON DELETE SET NULL
 );
 
 -- =====================
