@@ -336,7 +336,7 @@ async function simulate() {
                 land_category: 'Rainfed',
                 soil_type: 'Clay Loam',
                 topography: 'Flat',
-                irrigation_source: 'Rainfall',
+                irrigation_source: null,
                 tenural_status: 'Owner',
                 boundary_north: 'N/A', boundary_south: 'N/A', boundary_east: 'N/A', boundary_west: 'N/A',
                 current_crop: Math.random() > 0.5 ? 'Rice' : 'Corn',
