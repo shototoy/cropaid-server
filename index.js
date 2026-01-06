@@ -423,6 +423,116 @@ app.get('/api/farmer/profile', authenticateToken, async (req, res) => {
     }
 });
 
+// Get specific farm location for map
+// Get ALL farmer's farms
+app.get('/api/farmer/farms', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [rows] = await pool.execute(
+            `SELECT 
+                fm.id,
+                fm.latitude as lat, 
+                fm.longitude as lng, 
+                fm.location_barangay as barangay, 
+                fm.farm_size_hectares as size
+             FROM farmers f
+             JOIN farms fm ON f.id = fm.farmer_id
+             WHERE f.user_id = ?`,
+            [userId]
+        );
+
+        res.json(rows.map(r => ({
+            id: r.id,
+            lat: r.lat ? parseFloat(r.lat) : null,
+            lng: r.lng ? parseFloat(r.lng) : null,
+            barangay: r.barangay,
+            size: r.size
+        })));
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch farms' });
+    }
+});
+
+// Add a new farm
+app.post('/api/farmer/farm', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { lat, lng, barangay, size } = req.body;
+
+        // Get farmer ID
+        const [farmers] = await pool.execute('SELECT id FROM farmers WHERE user_id = ?', [userId]);
+        if (!farmers[0]) return res.status(404).json({ error: 'Farmer profile not found' });
+        const farmerId = farmers[0].id;
+
+        const [result] = await pool.execute(
+            `INSERT INTO farms (farmer_id, latitude, longitude, location_barangay, farm_size_hectares)
+             VALUES (?, ?, ?, ?, ?)`,
+            [farmerId, lat, lng, barangay, size]
+        );
+
+        res.status(201).json({
+            id: result.insertId,
+            lat, lng, barangay, size,
+            message: 'Farm added successfully'
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to add farm' });
+    }
+});
+
+// Update a specific farm
+app.put('/api/farmer/farm/:id', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const farmId = req.params.id;
+        const { lat, lng, barangay, size } = req.body;
+
+        // Verify ownership
+        const [rows] = await pool.execute(
+            `SELECT fm.id FROM farms fm 
+             JOIN farmers f ON fm.farmer_id = f.id 
+             WHERE fm.id = ? AND f.user_id = ?`,
+            [farmId, userId]
+        );
+        if (rows.length === 0) return res.status(403).json({ error: 'Not authorized to edit this farm' });
+
+        await pool.execute(
+            `UPDATE farms SET latitude = ?, longitude = ?, location_barangay = ?, farm_size_hectares = ? WHERE id = ?`,
+            [lat, lng, barangay, size, farmId]
+        );
+
+        res.json({ message: 'Farm updated successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update farm' });
+    }
+});
+
+// Delete a farm
+app.delete('/api/farmer/farm/:id', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const farmId = req.params.id;
+
+        // Verify ownership
+        const [rows] = await pool.execute(
+            `SELECT fm.id FROM farms fm 
+             JOIN farmers f ON fm.farmer_id = f.id 
+             WHERE fm.id = ? AND f.user_id = ?`,
+            [farmId, userId]
+        );
+        if (rows.length === 0) return res.status(403).json({ error: 'Not authorized to delete this farm' });
+
+        await pool.execute('DELETE FROM farms WHERE id = ?', [farmId]);
+        res.json({ message: 'Farm deleted successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete farm' });
+    }
+});
+
 // Update farmer profile
 app.patch('/api/farmer/profile', authenticateToken, async (req, res) => {
     let connection;
@@ -536,6 +646,31 @@ app.get('/api/public/reports', authenticateToken, async (req, res) => {
             [userId]
         );
         res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Get all farm locations for community map
+app.get('/api/public/farms', authenticateToken, async (req, res) => {
+    try {
+        const [rows] = await pool.execute(
+            `SELECT 
+                fm.id, fm.latitude, fm.longitude, fm.location_barangay,
+                f.first_name, f.last_name
+             FROM farms fm
+             JOIN farmers f ON fm.farmer_id = f.id
+             WHERE fm.latitude IS NOT NULL AND fm.longitude IS NOT NULL`
+        );
+
+        res.json(rows.map(row => ({
+            id: row.id,
+            lat: parseFloat(row.latitude),
+            lng: parseFloat(row.longitude),
+            barangay: row.location_barangay,
+            owner: `${row.first_name} ${row.last_name}`
+        })));
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error' });
