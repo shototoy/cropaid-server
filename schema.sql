@@ -70,6 +70,28 @@ CREATE TABLE IF NOT EXISTS farms (
     boundary_south VARCHAR(255),
     boundary_east VARCHAR(255),
     boundary_west VARCHAR(255),
+    
+    -- Farm Details
+    planting_method ENUM('Direct Seeding', 'Transplanting'),
+    date_of_sowing DATE,
+    date_of_transplanting DATE,
+    date_of_harvest DATE,
+    land_category ENUM('Irrigated', 'Rainfed', 'Upland'),
+    soil_type ENUM('Clay Loam', 'Silty Clay Loam', 'Silty Loam', 'Sandy Loam', 'Others'),
+    topography ENUM('Flat', 'Rolling', 'Hilly'),
+    irrigation_source ENUM('NIA/CIS', 'Deep Well', 'SWIP', 'STW'),
+    tenural_status ENUM('Owner', 'Lessee', 'Tenant'),
+    
+    -- Insurance / Coverage
+    current_crop VARCHAR(100),
+    cover_type VARCHAR(100),
+    amount_cover DECIMAL(15,2),
+    insurance_premium DECIMAL(15,2),
+    
+    -- CLTIP - ADSS
+    cltip_sum_insured DECIMAL(15,2),
+    cltip_premium DECIMAL(15,2),
+
     farm_size_hectares DECIMAL(10,2),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

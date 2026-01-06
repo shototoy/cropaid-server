@@ -9,7 +9,7 @@ const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'cropaid_db',
+    database: process.env.DB_NAME || 'cropaid',
     multipleStatements: true
 };
 
@@ -72,7 +72,7 @@ async function simulate() {
         // HELPER FUNCTIONS
         // ==========================================
 
-        async function registerFarmer(user, profile, farm) {
+        async function registerFarmer(user, profile, farmsData) {
             console.log(`   > Registering Farmer: ${profile.first_name} ${profile.last_name}...`);
             const userId = crypto.randomUUID();
 
@@ -97,18 +97,32 @@ async function simulate() {
             );
             const farmerId = farmerResult.insertId;
 
-            // 3. Create Farm
-            if (farm) {
-                await connection.execute(
-                    `INSERT INTO farms (
-                        farmer_id, location_barangay, location_sitio,
-                        latitude, longitude, farm_size_hectares
-                    ) VALUES (?, ?, ?, ?, ?, ?)`,
-                    [
-                        farmerId, farm.location_barangay, farm.location_sitio,
-                        farm.latitude, farm.longitude, farm.farm_size_hectares
-                    ]
-                );
+            // 3. Create Farms (Handle Array)
+            const farms = Array.isArray(farmsData) ? farmsData : [farmsData];
+
+            for (const farm of farms) {
+                if (farm) {
+                    await connection.execute(
+                        `INSERT INTO farms (
+                            farmer_id, location_barangay, location_sitio,
+                            latitude, longitude, farm_size_hectares,
+                            planting_method, date_of_sowing, date_of_transplanting, date_of_harvest,
+                            land_category, soil_type, topography, irrigation_source, tenural_status,
+                            boundary_north, boundary_south, boundary_east, boundary_west,
+                            current_crop, cover_type, amount_cover, insurance_premium,
+                            cltip_sum_insured, cltip_premium
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [
+                            farmerId, farm.location_barangay, farm.location_sitio,
+                            farm.latitude, farm.longitude, farm.farm_size_hectares,
+                            farm.planting_method || null, farm.date_of_sowing || null, farm.date_of_transplanting || null, farm.date_of_harvest || null,
+                            farm.land_category || null, farm.soil_type || null, farm.topography || null, farm.irrigation_source || null, farm.tenural_status || null,
+                            farm.boundary_north || null, farm.boundary_south || null, farm.boundary_east || null, farm.boundary_west || null,
+                            farm.current_crop || null, farm.cover_type || null, farm.amount_cover || null, farm.insurance_premium || null,
+                            farm.cltip_sum_insured || null, farm.cltip_premium || null
+                        ]
+                    );
+                }
             }
 
             return { userId, farmerId, name: `${profile.first_name} ${profile.last_name}` };
@@ -184,6 +198,24 @@ async function simulate() {
         await initStaticData();
 
         // --- Farmer 1: Shara ---
+        const sharaFarms = [
+            {
+                location_barangay: 'San Jose', location_sitio: 'Purok 1', latitude: 6.5250, longitude: 124.6750, farm_size_hectares: 2.5,
+                planting_method: 'Transplanting', date_of_sowing: '2025-11-01', date_of_transplanting: '2025-11-20', date_of_harvest: '2026-03-15',
+                land_category: 'Irrigated', soil_type: 'Clay Loam', topography: 'Flat', irrigation_source: 'NIA/CIS', tenural_status: 'Owner',
+                boundary_north: 'Road', boundary_south: 'River', boundary_east: 'Machico Farm', boundary_west: 'Canal',
+                current_crop: 'Rice', cover_type: 'Multi-Risk', amount_cover: 50000.00, insurance_premium: 2500.00,
+                cltip_sum_insured: 10000.00, cltip_premium: 500.00
+            },
+            {
+                location_barangay: 'San Jose', location_sitio: 'Purok 2', latitude: 6.5280, longitude: 124.6780, farm_size_hectares: 1.5,
+                planting_method: 'Direct Seeding', date_of_sowing: '2025-12-01', date_of_harvest: '2026-04-01',
+                land_category: 'Rainfed', soil_type: 'Silty Loam', topography: 'Flat', irrigation_source: 'STW', tenural_status: 'Lessee',
+                boundary_north: 'Desamero Farm 1', boundary_south: 'Highway', boundary_east: 'Vacant Lot', boundary_west: 'Residential',
+                current_crop: 'Corn', cover_type: 'Natural Disaster', amount_cover: 30000.00, insurance_premium: 1500.00
+            }
+        ];
+
         const shara = await registerFarmer(
             { username: 'shara.desamero', email: 'shara@gmail.com' },
             {
@@ -191,24 +223,41 @@ async function simulate() {
                 address_sitio: 'Purok 1', address_barangay: 'San Jose', cellphone: '09171234444',
                 sex: 'Female', date_of_birth: '1995-05-15', civil_status: 'Single'
             },
-            { location_barangay: 'San Jose', location_sitio: 'Purok 1', latitude: 6.5250, longitude: 124.6750, farm_size_hectares: 2.5 }
+            sharaFarms
         );
 
-        // Shara Report 1: Pest (Pending)
+        // Shara Report 1: Pest (Pending) - Linked to Farm 1
         await submitReport(shara, 'pest',
             { cropType: "Rice", pestType: "Rice Black Bug", severity: "High", affectedArea: "1.5", damageLevel: "Severe", description: "Black bug infestation observed in rice field mostly in the lower part." },
-            'San Jose', 6.5250, 124.6750, 2
+            'San Jose', sharaFarms[0].latitude, sharaFarms[0].longitude, 2
         );
 
-        // Shara Report 2: Drought (Verified)
+        // Shara Report 2: Drought (Verified) - Linked to Farm 2
         const sharaId2 = await submitReport(shara, 'drought',
-            { cropType: "Corn", severity: "Medium", affectedArea: "2.0", damageLevel: "Moderate", description: "Leaves curling due to lack of water for 2 weeks." },
-            'San Jose', 6.5255, 124.6755, 10
+            { cropType: "Corn", severity: "Medium", affectedArea: "1.0", damageLevel: "Moderate", description: "Leaves curling due to lack of water for 2 weeks on the second farm." },
+            'San Jose', sharaFarms[1].latitude, sharaFarms[1].longitude, 10
         );
         await verifyReport(sharaId2, "Verified during field inspection. Assistance recommended.", 9);
 
 
         // --- Farmer 2: James ---
+        const jamesFarms = [
+            {
+                location_barangay: 'Liberty', location_sitio: 'Purok 3', latitude: 6.5050, longitude: 124.6550, farm_size_hectares: 1.8,
+                planting_method: 'Direct Seeding', date_of_sowing: '2025-11-15', date_of_harvest: '2026-02-28',
+                land_category: 'Rainfed', soil_type: 'Sandy Loam', topography: 'Rolling', irrigation_source: 'Deep Well', tenural_status: 'Owner',
+                boundary_north: 'Desamero Farm', boundary_south: 'Hill', boundary_east: 'Road', boundary_west: 'Forest',
+                current_crop: 'Vegetables', cover_type: 'Natural Disaster', amount_cover: 20000.00, insurance_premium: 1000.00
+            },
+            {
+                location_barangay: 'Esperanza', location_sitio: 'Riverside', latitude: 6.5500, longitude: 124.6900, farm_size_hectares: 3.0,
+                planting_method: 'Transplanting', date_of_sowing: '2025-10-01', date_of_transplanting: '2025-10-25', date_of_harvest: '2026-02-15',
+                land_category: 'Irrigated', soil_type: 'Clay Loam', topography: 'Flat', irrigation_source: 'SWIP', tenural_status: 'Tenant',
+                boundary_north: 'River', boundary_south: 'Access Road', boundary_east: 'Corn Field', boundary_west: 'Coconut Plantation',
+                current_crop: 'Rice', cover_type: 'Multi-Risk', amount_cover: 60000.00, insurance_premium: 3000.00
+            }
+        ];
+
         const james = await registerFarmer(
             { username: 'james.machico', email: 'james@gmail.com' },
             {
@@ -216,20 +265,20 @@ async function simulate() {
                 address_sitio: 'Purok 3', address_barangay: 'Liberty', cellphone: '09181235555',
                 sex: 'Male', date_of_birth: '1990-08-20', civil_status: 'Married'
             },
-            { location_barangay: 'Liberty', location_sitio: 'Purok 3', latitude: 6.5050, longitude: 124.6550, farm_size_hectares: 1.8 }
+            jamesFarms
         );
 
-        // James Report 1: Flood (Resolved)
+        // James Report 1: Flood (Resolved) - Linked to Farm 1 (Liberty)
         const jamesId1 = await submitReport(james, 'flood',
             { cropType: "Vegetables", severity: "Critical", affectedArea: "0.5", damageLevel: "Total Loss", description: "River overflow washed away vegetable plots." },
-            'Liberty', 6.5050, 124.6550, 15
+            'Liberty', jamesFarms[0].latitude, jamesFarms[0].longitude, 15
         );
         await resolveReport(jamesId1, "Damage assessed and relief goods distributed.", 14);
 
-        // James Report 2: Pest (Pending - Recent)
+        // James Report 2: Pest (Pending - Recent) - Linked to Farm 2 (Esperanza)
         await submitReport(james, 'pest',
-            { cropType: "Corn", pestType: "Army Worm", severity: "Low", affectedArea: "0.2", damageLevel: "Minor", description: "Early signs of army worm on young corn." },
-            'Liberty', 6.5055, 124.6555, 0 // Today
+            { cropType: "Corn", pestType: "Army Worm", severity: "Low", affectedArea: "0.2", damageLevel: "Minor", description: "Early signs of army worm on young corn in Esperanza farm." },
+            'Esperanza', jamesFarms[1].latitude, jamesFarms[1].longitude, 0 // Today
         );
 
         console.log('✅ Simulation Complete!');
