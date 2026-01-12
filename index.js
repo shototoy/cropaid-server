@@ -38,7 +38,10 @@ const corsOptions = {
         'https://localhost',
         'ionic://localhost',
         'http://localhost',
-        'https://shototoy.github.io/CropAid/'
+        'https://shototoy.github.io/CropAid/',
+        'http://localhost:5174',
+        'http://localhost:5175',
+        'http://localhost:5176'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -105,7 +108,28 @@ const RegisterSchema = z.object({
         .max(127, 'Longitude must be within Philippines')
         .nullable()
         .optional(),
-    farmSize: z.string().optional()
+    farmSize: z.string().optional(),
+
+    // New Farm Fields
+    plantingMethod: z.string().optional(),
+    currentCrop: z.string().optional(),
+    dateOfSowing: z.string().optional(),
+    dateOfTransplanting: z.string().optional(),
+    dateOfHarvest: z.string().optional(),
+    landCategory: z.string().optional(),
+    topography: z.string().optional(),
+    soilType: z.string().optional(),
+    irrigationSource: z.string().optional(),
+    tenuralStatus: z.string().optional(),
+    boundaryNorth: z.string().optional(),
+    boundarySouth: z.string().optional(),
+    boundaryEast: z.string().optional(),
+    boundaryWest: z.string().optional(),
+    coverType: z.string().optional(),
+    amountCover: z.string().optional(),
+    insurancePremium: z.string().optional(),
+    cltipSumInsured: z.string().optional(),
+    cltipPremium: z.string().optional()
 });
 
 const LoginSchema = z.object({
@@ -134,7 +158,8 @@ const ReportSchema = z.object({
         .max(127, 'Longitude must be within Philippines')
         .nullable()
         .optional(),
-    photoBase64: z.string().nullable().optional()
+    photoBase64: z.string().nullable().optional(),
+    farmId: z.number().optional()
 });
 
 // ============ MIDDLEWARE ============
@@ -222,13 +247,22 @@ app.post('/api/auth/register', async (req, res) => {
         await connection.execute(
             `INSERT INTO farms (
                 farmer_id, location_sitio, location_barangay, location_municipality, location_province,
-                latitude, longitude, farm_size_hectares
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                latitude, longitude, farm_size_hectares,
+                planting_method, current_crop, date_of_sowing, date_of_transplanting, date_of_harvest,
+                land_category, topography, soil_type, irrigation_source, tenural_status,
+                boundary_north, boundary_south, boundary_east, boundary_west,
+                cover_type, amount_cover, insurance_premium, cltip_sum_insured, cltip_premium
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 farmerId, data.farmSitio || null, data.farmBarangay || null,
                 data.farmMunicipality || 'Norala', data.farmProvince || 'South Cotabato',
                 data.farmLatitude || null, data.farmLongitude || null,
-                data.farmSize ? parseFloat(data.farmSize) : null
+                data.farmSize ? parseFloat(data.farmSize) : null,
+                data.plantingMethod || null, data.currentCrop || null, data.dateOfSowing || null, data.dateOfTransplanting || null, data.dateOfHarvest || null,
+                data.landCategory || null, data.topography || null, data.soilType || null, data.irrigationSource || null, data.tenuralStatus || null,
+                data.boundaryNorth || null, data.boundarySouth || null, data.boundaryEast || null, data.boundaryWest || null,
+                data.coverType || null, data.amountCover ? parseFloat(data.amountCover) : null, data.insurancePremium ? parseFloat(data.insurancePremium) : null,
+                data.cltipSumInsured ? parseFloat(data.cltipSumInsured) : null, data.cltipPremium ? parseFloat(data.cltipPremium) : null
             ]
         );
 
@@ -745,6 +779,102 @@ app.get('/api/public/farms', authenticateToken, async (req, res) => {
     }
 });
 
+// GET /api/farmer/farms
+app.get('/api/farmer/farms', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [rows] = await pool.execute(
+            `SELECT fm.*, f.address_municipality
+             FROM farms fm
+             JOIN farmers f ON fm.farmer_id = f.id
+             WHERE f.user_id = ?
+             ORDER BY fm.created_at DESC`,
+            [userId]
+        );
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch farms' });
+    }
+});
+
+const FarmSchema = z.object({
+    farmSitio: z.string().optional(),
+    farmBarangay: z.string().optional(),
+    farmMunicipality: z.string().optional(),
+    farmProvince: z.string().optional(),
+    farmLatitude: z.number().optional(),
+    farmLongitude: z.number().optional(),
+    farmSize: z.string().optional(),
+    plantingMethod: z.string().optional(),
+    currentCrop: z.string().optional(),
+    dateOfSowing: z.string().optional(),
+    dateOfTransplanting: z.string().optional(),
+    dateOfHarvest: z.string().optional(),
+    landCategory: z.string().optional(),
+    topography: z.string().optional(),
+    soilType: z.string().optional(),
+    irrigationSource: z.string().optional(),
+    tenuralStatus: z.string().optional(),
+    boundaryNorth: z.string().optional(),
+    boundarySouth: z.string().optional(),
+    boundaryEast: z.string().optional(),
+    boundaryWest: z.string().optional(),
+    coverType: z.string().optional(),
+    amountCover: z.string().optional(),
+    insurancePremium: z.string().optional(),
+    cltipSumInsured: z.string().optional(),
+    cltipPremium: z.string().optional()
+});
+
+// POST /api/farmer/farms (Add new farm)
+app.post('/api/farmer/farms', authenticateToken, async (req, res) => {
+    try {
+        const data = FarmSchema.parse(req.body);
+        const userId = req.user.id;
+
+        const [farmerRows] = await pool.execute(
+            'SELECT id FROM farmers WHERE user_id = ?',
+            [userId]
+        );
+
+        if (!farmerRows[0]) {
+            return res.status(404).json({ error: 'Farmer profile not found' });
+        }
+        const farmerId = farmerRows[0].id;
+
+        const [result] = await pool.execute(
+            `INSERT INTO farms (
+                farmer_id, location_sitio, location_barangay, location_municipality, location_province,
+                latitude, longitude, farm_size_hectares,
+                planting_method, current_crop, date_of_sowing, date_of_transplanting, date_of_harvest,
+                land_category, topography, soil_type, irrigation_source, tenural_status,
+                boundary_north, boundary_south, boundary_east, boundary_west,
+                cover_type, amount_cover, insurance_premium, cltip_sum_insured, cltip_premium
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                farmerId, data.farmSitio || null, data.farmBarangay || null,
+                data.farmMunicipality || 'Norala', data.farmProvince || 'South Cotabato',
+                data.farmLatitude || null, data.farmLongitude || null,
+                data.farmSize ? parseFloat(data.farmSize) : null,
+                data.plantingMethod || null, data.currentCrop || null, data.dateOfSowing || null, data.dateOfTransplanting || null, data.dateOfHarvest || null,
+                data.landCategory || null, data.topography || null, data.soilType || null, data.irrigationSource || null, data.tenuralStatus || null,
+                data.boundaryNorth || null, data.boundarySouth || null, data.boundaryEast || null, data.boundaryWest || null,
+                data.coverType || null, data.amountCover ? parseFloat(data.amountCover) : null, data.insurancePremium ? parseFloat(data.insurancePremium) : null,
+                data.cltipSumInsured ? parseFloat(data.cltipSumInsured) : null, data.cltipPremium ? parseFloat(data.cltipPremium) : null
+            ]
+        );
+
+        res.status(201).json({ message: 'Farm added successfully', farmId: result.insertId });
+    } catch (err) {
+        console.error(err);
+        if (err instanceof z.ZodError) {
+            return res.status(400).json({ error: err.errors });
+        }
+        res.status(500).json({ error: 'Failed to add farm' });
+    }
+});
+
 app.post('/api/reports', authenticateToken, async (req, res) => {
     try {
         const data = ReportSchema.parse(req.body);
@@ -762,10 +892,12 @@ app.post('/api/reports', authenticateToken, async (req, res) => {
         }
 
         const [result] = await pool.execute(
-            `INSERT INTO reports (user_id, type, details, location, latitude, longitude, photo_base64)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO reports (user_id, farm_id, type, details, location, latitude, longitude, photo_base64)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                req.user.id, data.type,
+                req.user.id,
+                data.farmId || null,
+                data.type,
                 JSON.stringify(data.details || {}),
                 data.location || null,
                 data.latitude || null,
