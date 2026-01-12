@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS reports (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id CHAR(36) NOT NULL,
     farm_id INT, -- Optional link to specific farm
-    type ENUM('pest', 'flood', 'drought') NOT NULL,
+    type ENUM('pest', 'flood', 'drought', 'mix') NOT NULL,
     status ENUM('pending', 'verified', 'resolved', 'rejected') DEFAULT 'pending',
     location VARCHAR(255),
     latitude DECIMAL(10, 8),

@@ -298,10 +298,18 @@ async function simulate() {
 
         // James Report 1: Flood (Resolved) - Linked to Farm 1 (Liberty)
         const jamesId1 = await submitReport(james, james.farmIds[0], 'flood',
-            { cropType: "Vegetables", severity: "Critical", affectedArea: "0.5", damageLevel: "Total Loss", description: "River overflow washed away vegetable plots." },
-            'Liberty', jamesFarms[0].latitude, jamesFarms[0].longitude, 15
+            { cropType: "Vegetables", waterLevel: "High", affectedArea: "1.0", damageLevel: "High", description: "Vegetable farm submerged in flood waters due to heavy rain." },
+            'Liberty', jamesFarms[0].latitude, jamesFarms[0].longitude, 30
         );
-        await resolveReport(jamesId1, "Damage assessed and relief goods distributed.", 14);
+        await verifyReport(jamesId1, "Verified via satellite imagery.", 29);
+        await resolveReport(jamesId1, "Seedlings provided for replanting.", 25);
+
+        // James Report 2: Mix (Pending) - Linked to Farm 2 (Esperanza)
+        await submitReport(james, james.farmIds[1], 'mix',
+            { damageTypes: ["Pest", "Flood"], affectedArea: "2.5", description: "Heavy rains caused flooding which led to a pest outbreak (snails)." },
+            'Esperanza', jamesFarms[1].latitude, jamesFarms[1].longitude, 5
+        );
+
 
         // James Report 2: Pest (Pending - Recent) - Linked to Farm 2 (Esperanza)
         await submitReport(james, james.farmIds[1], 'pest',

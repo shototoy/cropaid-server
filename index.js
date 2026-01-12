@@ -138,7 +138,7 @@ const LoginSchema = z.object({
 });
 
 const ReportSchema = z.object({
-    type: z.enum(['pest', 'flood', 'drought']),
+    type: z.enum(['pest', 'flood', 'drought', 'mix']),
     details: z.object({
         description: z.string().optional(),
         damageLevel: z.string().optional(),
@@ -1326,11 +1326,34 @@ app.get('/api/admin/reports', authenticateToken, requireAdmin, async (req, res) 
                 r.id, r.type, r.status, r.location, r.latitude, r.longitude,
                 r.details, r.admin_notes, r.created_at, r.updated_at,
                 r.photo_base64 IS NOT NULL as has_photo,
-                f.first_name, f.last_name, f.rsbsa_id, f.cellphone,
-                fm.location_barangay as farm_barangay
+                
+                -- Farmer Details
+                f.first_name as farmer_first_name, f.last_name as farmer_last_name, 
+                f.rsbsa_id as farmer_rsbsa_id, f.cellphone as farmer_cellphone,
+                f.address_barangay as farmer_address_barangay, f.address_sitio as farmer_address_sitio,
+
+                -- Farm Details (Linked via r.farm_id)
+                fm.location_barangay as farm_barangay,
+                fm.farm_size_hectares as farm_size,
+                fm.planting_method as farm_planting_method,
+                fm.current_crop as farm_current_crop,
+                fm.date_of_sowing as farm_date_of_sowing,
+                fm.date_of_transplanting as farm_date_of_transplanting,
+                fm.date_of_harvest as farm_date_of_harvest,
+                fm.land_category as farm_land_category,
+                fm.topography as farm_topography,
+                fm.soil_type as farm_soil_type,
+                fm.irrigation_source as farm_irrigation_source,
+                fm.tenural_status as farm_tenural_status,
+                fm.cover_type as farm_cover_type,
+                fm.amount_cover as farm_amount_cover,
+                fm.insurance_premium as farm_insurance_premium,
+                fm.cltip_sum_insured as farm_cltip_sum_insured,
+                fm.cltip_premium as farm_cltip_premium
+
             FROM reports r
             JOIN farmers f ON r.user_id = f.user_id
-            LEFT JOIN farms fm ON f.id = fm.farmer_id
+            LEFT JOIN farms fm ON r.farm_id = fm.id
             WHERE 1=1
         `;
         const params = [];
