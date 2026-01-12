@@ -46,10 +46,8 @@ async function simulate() {
             console.log('   > Initializing Reference Data (Ref Data)...');
 
             // 1. Pest Categories
-            // Note: We use INSERT IGNORE or ON DUPLICATE UPDATE to avoid errors on re-run
-            // But simple INSERT with cleanup (setup-db drops db) is fine.
             await connection.execute(`
-                INSERT INTO pest_categories (name, description, severity_level, affected_crops) VALUES
+                INSERT IGNORE INTO pest_categories (name, description, severity_level, affected_crops) VALUES
                 ('Rice Black Bug', 'Saps the plant of its nutrients causing it to turn reddish brown or yellow.', 'high', '["Rice"]'),
                 ('Army Worm', 'Larvae feed on leaves and stems, causing massive defoliation.', 'high', '["Rice", "Corn", "Vegetables"]'),
                 ('Rodents', 'Rats that eat crops and grains.', 'medium', '["Rice", "Corn"]')
@@ -57,25 +55,24 @@ async function simulate() {
 
             // 2. Crop Types
             await connection.execute(`
-                INSERT INTO crop_types (name, description, season) VALUES
+                INSERT IGNORE INTO crop_types (name, description, season) VALUES
                 ('Rice', 'Staple food crop', 'Wet/Dry'),
                 ('Corn', 'Cereal grain', 'Dry'),
                 ('Vegetables', 'Various garden crops', 'Year-round')
             `);
 
-            // 3. Barangays
             // 3. Barangays (Dynamic from S.S.O.T)
             const barangayValues = Object.entries(barangayCenters)
                 .map(([name, coords]) => `('${name}', ${coords.lat}, ${coords.lng})`)
                 .join(', ');
 
             await connection.execute(`
-                INSERT INTO barangays (name, latitude, longitude) VALUES ${barangayValues}
+                INSERT IGNORE INTO barangays (name, latitude, longitude) VALUES ${barangayValues}
             `);
 
-            // 4. News & Advisories
-            // Ensure Admin UUID exists (created by seed.sql). 
-            // In case seed.sql failed, we create admin here? No, assuming seed.sql ran.
+            // 4. News & Advisories (Ensure Admin UUID exists from seed.sql)
+            // Using INSERT IGNORE based on title/content unique constraint (if any) or just accept duplicates if table doesn't have unique keys on content
+            // Assuming seed.sql runs first, admin exists.
             await connection.execute(`
                 INSERT INTO news (title, content, type, priority, created_at, is_active, author_id) VALUES
                 ('Pest Alert: Black Bug Infestation Warning', 'The Municipal Agriculture Office has detected increased black bug activity in several barangays including Poblacion, San Miguel, and Benigno Aquino. Farmers are advised to monitor their rice fields closely and report any signs of infestation immediately.', 'alert', 'high', DATE_SUB(NOW(), INTERVAL 1 DAY), TRUE, 'admin-uuid'),
@@ -325,22 +322,29 @@ async function simulate() {
             const farmerName = `Farmer ${barangay.replace(/[^a-zA-Z]/g, '')}`;
             const username = `farmer.${barangay.toLowerCase().replace(/[^a-z]/g, '')}`;
 
+            const isRice = Math.random() > 0.5;
+            const hasInsurance = Math.random() > 0.3;
+
             const communityFarms = [{
                 location_barangay: barangay,
                 location_sitio: 'Central',
                 latitude: center.lat, // Exact center for visibility
                 longitude: center.lng,
                 farm_size_hectares: (Math.random() * 3 + 0.5).toFixed(1), // Random size 0.5 - 3.5 ha
-                planting_method: Math.random() > 0.5 ? 'Direct Seeding' : 'Transplanting',
+                planting_method: isRice ? (Math.random() > 0.5 ? 'Transplanting' : 'Direct Seeding') : 'Direct Seeding',
                 date_of_sowing: '2025-11-01',
-                land_category: 'Rainfed',
-                soil_type: 'Clay Loam',
-                topography: 'Flat',
-                irrigation_source: null,
-                tenural_status: 'Owner',
+                land_category: Math.random() > 0.6 ? 'Irrigated' : 'Rainfed',
+                soil_type: ['Clay Loam', 'Silty Clay Loam', 'Silty Loam', 'Sandy Loam'][Math.floor(Math.random() * 4)],
+                topography: ['Flat', 'Rolling', 'Hilly'][Math.floor(Math.random() * 3)],
+                irrigation_source: ['NIA/CIS', 'Deep Well', 'SWIP', 'STW'][Math.floor(Math.random() * 4)],
+                tenural_status: ['Owner', 'Lessee', 'Tenant'][Math.floor(Math.random() * 3)],
                 boundary_north: 'N/A', boundary_south: 'N/A', boundary_east: 'N/A', boundary_west: 'N/A',
-                current_crop: Math.random() > 0.5 ? 'Rice' : 'Corn',
-                cover_type: 'None', amount_cover: 0, insurance_premium: 0
+                current_crop: isRice ? 'Rice' : 'Corn',
+                cover_type: hasInsurance ? (Math.random() > 0.5 ? 'Multi-Risk' : 'Natural Disaster') : null,
+                amount_cover: hasInsurance ? (Math.random() * 50000 + 10000).toFixed(2) : 0,
+                insurance_premium: hasInsurance ? (Math.random() * 3000 + 500).toFixed(2) : 0,
+                cltip_sum_insured: hasInsurance ? (Math.random() * 10000).toFixed(2) : 0,
+                cltip_premium: hasInsurance ? (Math.random() * 500).toFixed(2) : 0
             }];
 
             await registerFarmer(
