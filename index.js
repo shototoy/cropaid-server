@@ -496,6 +496,26 @@ app.get('/api/farmer/farms', authenticateToken, async (req, res) => {
     }
 });
 
+// Get Options (Crops, Pests)
+app.get('/api/options', async (req, res) => {
+    try {
+        const [crops] = await pool.execute('SELECT name FROM crop_types WHERE is_active = TRUE ORDER BY name');
+        const [pests] = await pool.execute('SELECT name, severity_level FROM pest_categories WHERE is_active = TRUE ORDER BY name');
+
+        res.json({
+            crops: crops.map(c => c.name),
+            pests: pests.map(p => ({ name: p.name, severity: p.severity_level }))
+        });
+    } catch (err) {
+        console.error('Error fetching options:', err);
+        // Fallback or empty if table missing
+        res.json({
+            crops: ['Rice', 'Corn', 'Vegetables', 'Fruits', 'Others'],
+            pests: []
+        });
+    }
+});
+
 // Add a new farm
 app.post('/api/farmer/farm', authenticateToken, async (req, res) => {
     try {
