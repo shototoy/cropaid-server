@@ -2298,6 +2298,75 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, 
     }
 });
 
+// ============ NOTIFICATIONS API ============
+
+// Get Notifications
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const limit = parseInt(req.query.limit) || 20;
+
+        const [rows] = await pool.execute(
+            `SELECT * FROM notifications 
+             WHERE user_id = ? 
+             ORDER BY created_at DESC 
+             LIMIT ?`,
+            [userId, limit]
+        );
+        res.json({ notifications: rows });
+    } catch (err) {
+        console.error('Fetch notifications error:', err);
+        res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+});
+
+// Get Unread Count
+app.get('/api/notifications/unread-count', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [rows] = await pool.execute(
+            'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE',
+            [userId]
+        );
+        res.json({ count: rows[0].count });
+    } catch (err) {
+        console.error('Count notifications error:', err);
+        res.status(500).json({ error: 'Failed to count notifications' });
+    }
+});
+
+// Mark single as read
+app.put('/api/notifications/:id/read', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const notifId = req.params.id;
+
+        await pool.execute(
+            'UPDATE notifications SET is_read = TRUE WHERE id = ? AND user_id = ?',
+            [notifId, userId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Mark read error:', err);
+        res.status(500).json({ error: 'Failed to update notification' });
+    }
+});
+
+// Mark all as read
+app.put('/api/notifications/mark-all-read', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        await pool.execute(
+            'UPDATE notifications SET is_read = TRUE WHERE user_id = ?',
+            [userId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Mark all read error:', err);
+        res.status(500).json({ error: 'Failed to update notifications' });
+    }
+});
+
 // ============ SPA FALLBACK - Serve frontend for non-API routes ============
 app.get('*', (req, res) => {
     // Only serve index.html for non-API routes
