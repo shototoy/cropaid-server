@@ -519,6 +519,9 @@ app.post('/api/farmer/farm', authenticateToken, async (req, res) => {
         if (!farmers[0]) return res.status(404).json({ error: 'Farmer profile not found' });
         const farmerId = farmers[0].id;
 
+        // Helper to format date for MySQL (YYYY-MM-DD)
+        const formatDate = (d) => (d && d !== '') ? d.toString().split('T')[0] : null;
+
         const [result] = await pool.execute(
             `INSERT INTO farms (
                 farmer_id, latitude, longitude, location_barangay, location_sitio, farm_size_hectares,
@@ -530,7 +533,10 @@ app.post('/api/farmer/farm', authenticateToken, async (req, res) => {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 farmerId, lat, lng, location_barangay, location_sitio, farm_size_hectares,
-                planting_method || null, date_of_sowing || null, date_of_transplanting || null, date_of_harvest || null,
+                planting_method || null,
+                formatDate(date_of_sowing),
+                formatDate(date_of_transplanting),
+                formatDate(date_of_harvest),
                 land_category || null, soil_type || null, topography || null, irrigation_source || null, tenural_status || null,
                 boundary_north || null, boundary_south || null, boundary_east || null, boundary_west || null,
                 current_crop || null, cover_type || null, amount_cover || null, insurance_premium || null,
@@ -540,12 +546,11 @@ app.post('/api/farmer/farm', authenticateToken, async (req, res) => {
 
         res.status(201).json({
             id: result.insertId,
-            lat, lng, barangay, size,
             message: 'Farm added successfully'
         });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to add farm' });
+        res.status(500).json({ error: 'Failed to add farm', details: err.message });
     }
 });
 
@@ -572,6 +577,9 @@ app.put('/api/farmer/farm/:id', authenticateToken, async (req, res) => {
         );
         if (rows.length === 0) return res.status(403).json({ error: 'Not authorized to edit this farm' });
 
+        // Helper to format date for MySQL (YYYY-MM-DD)
+        const formatDate = (d) => (d && d !== '') ? d.toString().split('T')[0] : null;
+
         // Explicit Update Logic
         await pool.execute(
             `UPDATE farms SET 
@@ -585,9 +593,9 @@ app.put('/api/farmer/farm/:id', authenticateToken, async (req, res) => {
             [
                 lat, lng, location_barangay, location_sitio, farm_size_hectares,
                 planting_method || null,
-                (date_of_sowing === '' ? null : date_of_sowing) || null,
-                (date_of_transplanting === '' ? null : date_of_transplanting) || null,
-                (date_of_harvest === '' ? null : date_of_harvest) || null,
+                formatDate(date_of_sowing),
+                formatDate(date_of_transplanting),
+                formatDate(date_of_harvest),
                 land_category || null, soil_type || null, topography || null, irrigation_source || null, tenural_status || null,
                 boundary_north, boundary_south, boundary_east, boundary_west,
                 current_crop || null, cover_type, amount_cover, insurance_premium,
