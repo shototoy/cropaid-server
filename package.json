@@ -8,7 +8,7 @@
                 "dev": "node --watch index.js",
                 "setup": "node setup-db.js",
                 "simulate": "node simulate-data.js",
-                "deploy": "node setup-db.js && node index.js"
+                "deploy": "node index.js"
         },
         "dependencies": {
                 "bcryptjs": "^2.4.3",

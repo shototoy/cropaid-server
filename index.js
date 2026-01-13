@@ -244,27 +244,7 @@ app.post('/api/auth/register', async (req, res) => {
 
         const farmerId = farmerResult.insertId;
 
-        await connection.execute(
-            `INSERT INTO farms (
-                farmer_id, location_sitio, location_barangay, location_municipality, location_province,
-                latitude, longitude, farm_size_hectares,
-                planting_method, current_crop, date_of_sowing, date_of_transplanting, date_of_harvest,
-                land_category, topography, soil_type, irrigation_source, tenural_status,
-                boundary_north, boundary_south, boundary_east, boundary_west,
-                cover_type, amount_cover, insurance_premium, cltip_sum_insured, cltip_premium
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                farmerId, data.farmSitio || null, data.farmBarangay || null,
-                data.farmMunicipality || 'Norala', data.farmProvince || 'South Cotabato',
-                data.farmLatitude || null, data.farmLongitude || null,
-                data.farmSize ? parseFloat(data.farmSize) : null,
-                data.plantingMethod || null, data.currentCrop || null, data.dateOfSowing || null, data.dateOfTransplanting || null, data.dateOfHarvest || null,
-                data.landCategory || null, data.topography || null, data.soilType || null, data.irrigationSource || null, data.tenuralStatus || null,
-                data.boundaryNorth || null, data.boundarySouth || null, data.boundaryEast || null, data.boundaryWest || null,
-                data.coverType || null, data.amountCover ? parseFloat(data.amountCover) : null, data.insurancePremium ? parseFloat(data.insurancePremium) : null,
-                data.cltipSumInsured ? parseFloat(data.cltipSumInsured) : null, data.cltipPremium ? parseFloat(data.cltipPremium) : null
-            ]
-        );
+
 
         await connection.commit();
         res.status(201).json({ message: 'Registration successful', userId });
@@ -617,7 +597,8 @@ app.put('/api/farmer/farm/:id', authenticateToken, async (req, res) => {
             const dbColumn = fieldMap[key];
             if (dbColumn && allowedFields.includes(dbColumn)) {
                 updates.push(`${dbColumn} = ?`);
-                values.push(req.body[key]);
+                const val = req.body[key];
+                values.push(val === '' ? null : val);
             }
         });
 
