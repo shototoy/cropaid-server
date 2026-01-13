@@ -572,49 +572,34 @@ app.put('/api/farmer/farm/:id', authenticateToken, async (req, res) => {
         );
         if (rows.length === 0) return res.status(403).json({ error: 'Not authorized to edit this farm' });
 
-        // Dynamic Update Logic
-        const updates = [];
-        const values = [];
-        const allowedFields = [
-            'latitude', 'longitude', 'location_barangay', 'location_sitio', 'farm_size_hectares',
-            'planting_method', 'date_of_sowing', 'date_of_transplanting', 'date_of_harvest',
-            'land_category', 'soil_type', 'topography', 'irrigation_source', 'tenural_status',
-            'boundary_north', 'boundary_south', 'boundary_east', 'boundary_west',
-            'current_crop', 'cover_type', 'amount_cover', 'insurance_premium',
-            'cltip_sum_insured', 'cltip_premium'
-        ];
-
-        // Map req.body keys to DB columns (req.body uses same names mostly, except lat/lng alias)
-        const fieldMap = {
-            lat: 'latitude',
-            lng: 'longitude',
-            barangay: 'location_barangay',
-            size: 'farm_size_hectares',
-            ...allowedFields.reduce((acc, outputKey) => ({ ...acc, [outputKey]: outputKey }), {})
-        };
-
-        Object.keys(req.body).forEach(key => {
-            const dbColumn = fieldMap[key];
-            if (dbColumn && allowedFields.includes(dbColumn)) {
-                updates.push(`${dbColumn} = ?`);
-                const val = req.body[key];
-                values.push(val === '' ? null : val);
-            }
-        });
-
-        if (updates.length === 0) return res.status(400).json({ error: 'No valid fields to update' });
-
-        values.push(farmId);
-
+        // Explicit Update Logic
         await pool.execute(
-            `UPDATE farms SET ${updates.join(', ')} WHERE id = ?`,
-            values
+            `UPDATE farms SET 
+                latitude = ?, longitude = ?, location_barangay = ?, location_sitio = ?, farm_size_hectares = ?,
+                planting_method = ?, date_of_sowing = ?, date_of_transplanting = ?, date_of_harvest = ?,
+                land_category = ?, soil_type = ?, topography = ?, irrigation_source = ?, tenural_status = ?,
+                boundary_north = ?, boundary_south = ?, boundary_east = ?, boundary_west = ?,
+                current_crop = ?, cover_type = ?, amount_cover = ?, insurance_premium = ?,
+                cltip_sum_insured = ?, cltip_premium = ?
+             WHERE id = ?`,
+            [
+                lat, lng, location_barangay, location_sitio, farm_size_hectares,
+                planting_method || null,
+                (date_of_sowing === '' ? null : date_of_sowing) || null,
+                (date_of_transplanting === '' ? null : date_of_transplanting) || null,
+                (date_of_harvest === '' ? null : date_of_harvest) || null,
+                land_category || null, soil_type || null, topography || null, irrigation_source || null, tenural_status || null,
+                boundary_north, boundary_south, boundary_east, boundary_west,
+                current_crop || null, cover_type, amount_cover, insurance_premium,
+                cltip_sum_insured, cltip_premium,
+                farmId
+            ]
         );
 
         res.json({ message: 'Farm updated successfully' });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update farm' });
+        res.status(500).json({ error: 'Failed to update farm', details: err.message });
     }
 });
 
@@ -1585,7 +1570,7 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
         });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed' });
+        res.status(500).json({ error: 'Failed to fetch notifications', details: err.message });
     }
 });
 
