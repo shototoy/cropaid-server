@@ -516,6 +516,11 @@ app.get('/api/options', async (req, res) => {
     }
 });
 
+// Health Check Endpoint
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date() });
+});
+
 // Add a new farm
 app.post('/api/farmer/farm', authenticateToken, async (req, res) => {
     try {
