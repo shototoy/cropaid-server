@@ -506,7 +506,7 @@ app.post('/api/farmer/farm', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const {
-            lat, lng, location_barangay, location_sitio, farm_size_hectares,
+            latitude, longitude, location_barangay, location_sitio, farm_size_hectares,
             planting_method, date_of_sowing, date_of_transplanting, date_of_harvest,
             land_category, soil_type, topography, irrigation_source, tenural_status,
             boundary_north, boundary_south, boundary_east, boundary_west,
@@ -532,7 +532,7 @@ app.post('/api/farmer/farm', authenticateToken, async (req, res) => {
                 cltip_sum_insured, cltip_premium
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                farmerId, lat, lng, location_barangay, location_sitio, farm_size_hectares,
+                farmerId, latitude || null, longitude || null, location_barangay || null, location_sitio || null, farm_size_hectares || null,
                 planting_method || null,
                 formatDate(date_of_sowing),
                 formatDate(date_of_transplanting),
@@ -560,7 +560,7 @@ app.put('/api/farmer/farm/:id', authenticateToken, async (req, res) => {
         const userId = req.user.id;
         const farmId = req.params.id;
         const {
-            lat, lng, location_barangay, location_sitio, farm_size_hectares,
+            latitude, longitude, location_barangay, location_sitio, farm_size_hectares,
             planting_method, date_of_sowing, date_of_transplanting, date_of_harvest,
             land_category, soil_type, topography, irrigation_source, tenural_status,
             boundary_north, boundary_south, boundary_east, boundary_west,
@@ -591,15 +591,15 @@ app.put('/api/farmer/farm/:id', authenticateToken, async (req, res) => {
                 cltip_sum_insured = ?, cltip_premium = ?
              WHERE id = ?`,
             [
-                lat, lng, location_barangay, location_sitio, farm_size_hectares,
+                latitude || null, longitude || null, location_barangay || null, location_sitio || null, farm_size_hectares || null,
                 planting_method || null,
                 formatDate(date_of_sowing),
                 formatDate(date_of_transplanting),
                 formatDate(date_of_harvest),
                 land_category || null, soil_type || null, topography || null, irrigation_source || null, tenural_status || null,
-                boundary_north, boundary_south, boundary_east, boundary_west,
-                current_crop || null, cover_type, amount_cover, insurance_premium,
-                cltip_sum_insured, cltip_premium,
+                boundary_north || null, boundary_south || null, boundary_east || null, boundary_west || null,
+                current_crop || null, cover_type || null, amount_cover || null, insurance_premium || null,
+                cltip_sum_insured || null, cltip_premium || null,
                 farmId
             ]
         );
@@ -2093,141 +2093,163 @@ app.delete('/api/admin/news/:id', authenticateToken, requireAdmin, async (req, r
     }
 });
 
-// ============ ADMIN SETTINGS ENDPOINTS ============
+// ============ FARMER ENDPOINTS - REPORTS HISTORY ============
 
-app.get('/api/admin/pest-categories', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/reports/history', authenticateToken, async (req, res) => {
     try {
-        const [rows] = await pool.execute('SELECT * FROM pest_categories ORDER BY name ASC');
-        res.json({ categories: rows });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
-app.post('/api/admin/pest-categories', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const { name, description } = req.body;
-        const [result] = await pool.execute(
-            'INSERT INTO pest_categories (name, description) VALUES (?, ?)',
-            [name, description || null]
+        const [rows] = await pool.execute(
+            `SELECT r.*, f.first_name, f.last_name 
+             FROM reports r
+             LEFT JOIN farmers f ON f.user_id = r.user_id
+             WHERE r.user_id = ?
+             ORDER BY r.created_at DESC`,
+            [req.user.userId]
         );
-        res.status(201).json({ id: result.insertId, message: 'Pest category created' });
+        res.json(rows);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Reports history error:', err);
+        res.status(500).json({ error: 'Failed to fetch reports history' });
     }
 });
 
-app.put('/api/admin/pest-categories/:id', authenticateToken, requireAdmin, async (req, res) => {
+// ============ NOTIFICATIONS ENDPOINT ============
+
+app.get('/api/notifications', authenticateToken, async (req, res) => {
     try {
-        const { name, description } = req.body;
+        const [rows] = await pool.execute(
+            `SELECT * FROM notifications 
+             WHERE user_id = ? 
+             ORDER BY created_at DESC 
+             LIMIT 50`,
+            [req.user.userId]
+        );
+        res.json(rows);
+    } catch (err) {
+        console.error('Notifications error:', err);
+        res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+});
+
+app.patch('/api/notifications/:id/read', authenticateToken, async (req, res) => {
+    try {
         await pool.execute(
-            'UPDATE pest_categories SET name = ?, description = ? WHERE id = ?',
-            [name, description || null, req.params.id]
+            'UPDATE notifications SET is_read = TRUE WHERE id = ? AND user_id = ?',
+            [req.params.id, req.user.userId]
         );
-        res.json({ message: 'Pest category updated' });
+        res.json({ message: 'Notification marked as read' });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Mark notification read error:', err);
+        res.status(500).json({ error: 'Failed to update notification' });
     }
 });
 
-app.delete('/api/admin/pest-categories/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/notifications/unread-count', authenticateToken, async (req, res) => {
     try {
-        await pool.execute('DELETE FROM pest_categories WHERE id = ?', [req.params.id]);
-        res.json({ message: 'Pest category deleted' });
+        const since = req.query.since;
+        let query = 'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE';
+        let params = [req.user.userId];
+
+        if (since) {
+            query += ' AND created_at > ?';
+            params.push(since);
+        }
+
+        const [rows] = await pool.execute(query, params);
+        res.json({ count: rows[0].count });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Unread count error:', err);
+        res.status(500).json({ error: 'Failed to fetch unread count' });
     }
 });
 
-app.get('/api/admin/crop-types', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const [rows] = await pool.execute('SELECT * FROM crop_types ORDER BY name ASC');
-        res.json({ cropTypes: rows });
+        const [[farmerCount]] = await pool.execute('SELECT COUNT(*) as count FROM farmers');
+        const [[reportStats]] = await pool.execute(`
+            SELECT 
+                COUNT(*) as totalReports,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pendingReports,
+                SUM(CASE WHEN status = 'verified' THEN 1 ELSE 0 END) as verifiedReports,
+                SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolvedReports,
+                SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejectedReports
+            FROM reports
+        `);
+
+        const [reportsByType] = await pool.execute(`
+            SELECT type, COUNT(*) as count 
+            FROM reports 
+            GROUP BY type
+        `);
+
+        const [reportsByBarangay] = await pool.execute(`
+            SELECT location as barangay, COUNT(*) as count 
+            FROM reports 
+            WHERE location IS NOT NULL
+            GROUP BY location 
+            ORDER BY count DESC 
+            LIMIT 10
+        `);
+
+        res.json({
+            totalFarmers: farmerCount.count,
+            ...reportStats,
+            reportsByType,
+            reportsByBarangay,
+            weatherAlerts: 0
+        });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Admin stats error:', err);
+        res.status(500).json({ error: 'Failed to fetch admin stats' });
     }
 });
 
-app.post('/api/admin/crop-types', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/admin/reports', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { name, variety, description } = req.body;
-        const [result] = await pool.execute(
-            'INSERT INTO crop_types (name, variety, description) VALUES (?, ?, ?)',
-            [name, variety || null, description || null]
-        );
-        res.status(201).json({ id: result.insertId, message: 'Crop type created' });
+        const limit = req.query.limit || 50;
+        const status = req.query.status;
+
+        let query = `
+            SELECT r.*, 
+                   f.first_name, f.last_name, f.cellphone, f.rsbsa_id,
+                   u.username
+            FROM reports r
+            LEFT JOIN farmers f ON f.user_id = r.user_id
+            LEFT JOIN users u ON u.id = r.user_id
+        `;
+
+        const params = [];
+        if (status) {
+            query += ' WHERE r.status = ?';
+            params.push(status);
+        }
+
+        query += ' ORDER BY r.created_at DESC LIMIT ?';
+        params.push(parseInt(limit));
+
+        const [rows] = await pool.execute(query, params);
+        res.json({ reports: rows });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Admin reports error:', err);
+        res.status(500).json({ error: 'Failed to fetch reports' });
     }
 });
 
-app.put('/api/admin/crop-types/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { name, variety, description } = req.body;
-        await pool.execute(
-            'UPDATE crop_types SET name = ?, variety = ?, description = ? WHERE id = ?',
-            [name, variety || null, description || null, req.params.id]
-        );
-        res.json({ message: 'Crop type updated' });
+        const [rows] = await pool.execute(`
+            SELECT u.id, u.username, u.email, u.role, u.is_active, u.created_at,
+                   f.first_name, f.last_name, f.rsbsa_id
+            FROM users u
+            LEFT JOIN farmers f ON f.user_id = u.id
+            ORDER BY u.created_at DESC
+        `);
+        res.json(rows);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Admin users error:', err);
+        res.status(500).json({ error: 'Failed to fetch users' });
     }
 });
 
-app.delete('/api/admin/crop-types/:id', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        await pool.execute('DELETE FROM crop_types WHERE id = ?', [req.params.id]);
-        res.json({ message: 'Crop type deleted' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
-app.get('/api/admin/barangays', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const [rows] = await pool.execute('SELECT * FROM barangays ORDER BY name ASC');
-        res.json({ barangays: rows });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
-app.post('/api/admin/barangays', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const { name, municipality, province } = req.body;
-        const [result] = await pool.execute(
-            'INSERT INTO barangays (name, municipality, province) VALUES (?, ?, ?)',
-            [name, municipality || 'Norala', province || 'South Cotabato']
-        );
-        res.status(201).json({ id: result.insertId, message: 'Barangay created' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
-app.put('/api/admin/barangays/:id', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const { name, municipality, province } = req.body;
-        await pool.execute(
-            'UPDATE barangays SET name = ?, municipality = ?, province = ? WHERE id = ?',
-            [name, municipality || 'Norala', province || 'South Cotabato', req.params.id]
-        );
-        res.json({ message: 'Barangay updated' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
 
 app.delete('/api/admin/barangays/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
