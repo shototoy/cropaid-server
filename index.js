@@ -1613,12 +1613,12 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
             `SELECT * FROM notifications 
              WHERE user_id = ? OR user_id IS NULL
              ORDER BY created_at DESC LIMIT 50`,
-            [req.user.id]
+            [req.user.id || null]
         );
         const [unreadCount] = await pool.execute(
             `SELECT COUNT(*) as count FROM notifications 
              WHERE (user_id = ? OR user_id IS NULL) AND is_read = FALSE`,
-            [req.user.id]
+            [req.user.id || null]
         );
         res.json({
             notifications: rows,
@@ -1635,7 +1635,7 @@ app.get('/api/notifications/unread-count', authenticateToken, async (req, res) =
         const since = req.query.since;
         let query = `SELECT COUNT(*) as count FROM notifications
         WHERE(user_id = ? OR(user_id IS NULL AND ? = 'admin')) AND is_read = FALSE`;
-        const params = [req.user.id, req.user.role];
+        const params = [req.user.id || null, req.user.role || ''];
 
         if (since) {
             query += ` AND created_at > ? `;
