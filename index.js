@@ -1802,27 +1802,29 @@ app.get('/api/admin/pest-categories', authenticateToken, requireAdmin, async (re
 
 app.post('/api/admin/pest-categories', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { name, description, severityLevel, affectedCrops } = req.body;
+        const { name, description } = req.body;
         const [result] = await pool.execute(
-            `INSERT INTO pest_categories(name, description, severity_level, affected_crops) VALUES(?, ?, ?, ?)`,
-            [name, description, severityLevel || 'medium', affectedCrops]
+            `INSERT INTO pest_categories(name, description) VALUES(?, ?)`,
+            [name, description || null]
         );
         res.status(201).json({ id: result.insertId, message: 'Pest category created' });
     } catch (err) {
-        res.status(500).json({ error: 'Server error' });
+        console.error('Pest category creation error:', err);
+        res.status(500).json({ error: 'Server error', details: err.message });
     }
 });
 
 app.put('/api/admin/pest-categories/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { name, description, severityLevel, affectedCrops, isActive } = req.body;
+        const { name, description } = req.body;
         await pool.execute(
-            `UPDATE pest_categories SET name = ?, description = ?, severity_level = ?, affected_crops = ?, is_active = ? WHERE id = ? `,
-            [name, description, severityLevel, affectedCrops, isActive, req.params.id]
+            `UPDATE pest_categories SET name = ?, description = ? WHERE id = ?`,
+            [name, description || null, req.params.id]
         );
         res.json({ message: 'Pest category updated' });
     } catch (err) {
-        res.status(500).json({ error: 'Server error' });
+        console.error('Pest category update error:', err);
+        res.status(500).json({ error: 'Server error', details: err.message });
     }
 });
 
@@ -1846,21 +1848,29 @@ app.get('/api/admin/crop-types', authenticateToken, requireAdmin, async (req, re
 
 app.post('/api/admin/crop-types', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { name, variety, description, season } = req.body;
-        const [result] = await pool.execute(`INSERT INTO crop_types(name, variety, description, season) VALUES(?, ?, ?, ?)`, [name, variety, description, season]);
+        const { name, variety } = req.body;
+        const [result] = await pool.execute(
+            `INSERT INTO crop_types(name, variety) VALUES(?, ?)`,
+            [name, variety || null]
+        );
         res.status(201).json({ id: result.insertId, message: 'Crop type created' });
     } catch (err) {
-        res.status(500).json({ error: 'Server error' });
+        console.error('Crop type creation error:', err);
+        res.status(500).json({ error: 'Server error', details: err.message });
     }
 });
 
 app.put('/api/admin/crop-types/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { name, variety, description, season, isActive } = req.body;
-        await pool.execute(`UPDATE crop_types SET name = ?, variety = ?, description = ?, season = ?, is_active = ? WHERE id = ? `, [name, variety, description, season, isActive, req.params.id]);
+        const { name, variety } = req.body;
+        await pool.execute(
+            `UPDATE crop_types SET name = ?, variety = ? WHERE id = ?`,
+            [name, variety || null, req.params.id]
+        );
         res.json({ message: 'Crop type updated' });
     } catch (err) {
-        res.status(500).json({ error: 'Server error' });
+        console.error('Crop type update error:', err);
+        res.status(500).json({ error: 'Server error', details: err.message });
     }
 });
 
