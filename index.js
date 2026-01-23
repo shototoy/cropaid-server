@@ -731,71 +731,7 @@ app.patch('/api/farmer/profile', authenticateToken, async (req, res) => {
 // ============ NOTIFICATIONS API ============
 
 // Get Notifications
-app.get('/api/notifications', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const limit = parseInt(req.query.limit) || 20;
 
-        const [rows] = await pool.execute(
-            `SELECT * FROM notifications 
-             WHERE user_id = ? 
-             ORDER BY created_at DESC 
-             LIMIT ?`,
-            [userId, limit]
-        );
-        res.json({ notifications: rows });
-    } catch (err) {
-        console.error('Fetch notifications error:', err);
-        res.status(500).json({ error: 'Failed to fetch notifications' });
-    }
-});
-
-// Get Unread Count
-app.get('/api/notifications/unread-count', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const [rows] = await pool.execute(
-            'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE',
-            [userId]
-        );
-        res.json({ count: rows[0].count });
-    } catch (err) {
-        console.error('Count notifications error:', err);
-        res.status(500).json({ error: 'Failed to count notifications' });
-    }
-});
-
-// Mark single as read
-app.put('/api/notifications/:id/read', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const notifId = req.params.id;
-
-        await pool.execute(
-            'UPDATE notifications SET is_read = TRUE WHERE id = ? AND user_id = ?',
-            [notifId, userId]
-        );
-        res.json({ success: true });
-    } catch (err) {
-        console.error('Mark read error:', err);
-        res.status(500).json({ error: 'Failed to update notification' });
-    }
-});
-
-// Mark all as read
-app.put('/api/notifications/mark-all-read', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        await pool.execute(
-            'UPDATE notifications SET is_read = TRUE WHERE user_id = ?',
-            [userId]
-        );
-        res.json({ success: true });
-    } catch (err) {
-        console.error('Mark all read error:', err);
-        res.status(500).json({ error: 'Failed to update notifications' });
-    }
-});
 
 // Get public reports for community map
 app.get('/api/public/reports', authenticateToken, async (req, res) => {
@@ -2435,6 +2371,30 @@ app.get('*', (req, res) => {
         res.status(404).json({ error: 'API endpoint not found' });
     }
 });
+
+// ============ DATABASE INIT ============
+const initDB = async () => {
+    try {
+        await pool.execute(`
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id CHAR(36),
+                type ENUM('new_report', 'status_change', 'advisory', 'system') NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                message TEXT,
+                is_read BOOLEAN DEFAULT FALSE,
+                reference_id VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        console.log('Notifications table checked/created');
+    } catch (err) {
+        console.error('Database initialization error:', err);
+    }
+};
+
+initDB();
 
 // ============ START SERVER ============
 
