@@ -1401,7 +1401,8 @@ app.get('/api/admin/reports', authenticateToken, requireAdmin, async (req, res) 
                 fm.amount_cover as farm_amount_cover,
                 fm.insurance_premium as farm_insurance_premium,
                 fm.cltip_sum_insured as farm_cltip_sum_insured,
-                fm.cltip_premium as farm_cltip_premium
+                fm.cltip_premium as farm_cltip_premium,
+                fm.boundary_north, fm.boundary_south, fm.boundary_east, fm.boundary_west
 
             FROM reports r
             JOIN farmers f ON r.user_id = f.user_id
@@ -1514,11 +1515,21 @@ app.patch('/api/admin/reports/:id/status', authenticateToken, requireAdmin, asyn
         try {
             const [report] = await pool.execute('SELECT user_id, type FROM reports WHERE id = ?', [req.params.id]);
             if (report[0]) {
-                await pool.execute(
-                    `INSERT INTO notifications (user_id, type, title, message, reference_id)
-                     VALUES (?, 'status_change', ?, ?, ?)`,
-                    [report[0].user_id, `Report ${status}`, `Your ${report[0].type} report has been ${status}`, req.params.id.toString()]
+                // Check for recent duplicate notification (within 1 min)
+                const [existing] = await pool.execute(
+                    `SELECT id FROM notifications 
+                     WHERE user_id = ? AND reference_id = ? AND title = ? 
+                     AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)`,
+                    [report[0].user_id, req.params.id.toString(), `Report ${status}`]
                 );
+
+                if (existing.length === 0) {
+                    await pool.execute(
+                        `INSERT INTO notifications (user_id, type, title, message, reference_id)
+                         VALUES (?, 'status_change', ?, ?, ?)`,
+                        [report[0].user_id, `Report ${status}`, `Your ${report[0].type} report has been ${status}`, req.params.id.toString()]
+                    );
+                }
             }
         } catch (e) { /* notifications table might not exist */ }
 
@@ -2197,36 +2208,8 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
     }
 });
 
-app.get('/api/admin/reports', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const limit = req.query.limit || 50;
-        const status = req.query.status;
-
-        let query = `
-            SELECT r.*, 
-                   f.first_name, f.last_name, f.cellphone, f.rsbsa_id,
-                   u.username
-            FROM reports r
-            LEFT JOIN farmers f ON f.user_id = r.user_id
-            LEFT JOIN users u ON u.id = r.user_id
-        `;
-
-        const params = [];
-        if (status) {
-            query += ' WHERE r.status = ?';
-            params.push(status);
-        }
-
-        query += ' ORDER BY r.created_at DESC LIMIT ?';
-        params.push(parseInt(limit));
-
-        const [rows] = await pool.execute(query, params);
-        res.json({ reports: rows });
-    } catch (err) {
-        console.error('Admin reports error:', err);
-        res.status(500).json({ error: 'Failed to fetch reports' });
-    }
-});
+// Duplicate GET /api/admin/reports removed
+// (Handled by the endpoint defined earlier around line 1365)
 
 app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
     try {
@@ -2359,6 +2342,23 @@ app.put('/api/notifications/mark-all-read', authenticateToken, async (req, res) 
     } catch (err) {
         console.error('Mark all read error:', err);
         res.status(500).json({ error: 'Failed to update notifications' });
+    }
+});
+
+// Delete notification
+app.delete('/api/notifications/:id', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id || null;
+        const notifId = req.params.id;
+
+        await pool.execute(
+            'DELETE FROM notifications WHERE id = ? AND user_id = ?',
+            [notifId, userId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Delete notification error:', err);
+        res.status(500).json({ error: 'Failed to delete notification' });
     }
 });
 
