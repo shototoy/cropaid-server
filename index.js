@@ -943,6 +943,54 @@ app.post('/api/farmer/farms', authenticateToken, async (req, res) => {
     }
 });
 
+// PATCH /api/farmer/farm/:id (Partial update - fixes map pin resetting data)
+app.patch('/api/farmer/farm/:id', authenticateToken, async (req, res) => {
+    try {
+        const { lat, lng, barangay, size, current_crop } = req.body;
+        const updates = [];
+        const params = [];
+
+        // Map headers
+        if (lat !== undefined) { updates.push('latitude = ?'); params.push(lat); }
+        if (lng !== undefined) { updates.push('longitude = ?'); params.push(lng); }
+        if (barangay !== undefined) { updates.push('location_barangay = ?'); params.push(barangay); }
+        if (size !== undefined) { updates.push('farm_size_hectares = ?'); params.push(parseFloat(size) || 0); }
+        if (current_crop !== undefined) { updates.push('current_crop = ?'); params.push(current_crop); }
+
+        if (updates.length === 0) return res.json({ message: 'No changes' });
+
+        params.push(req.params.id);
+        params.push(req.user.id); // Security check
+
+        const [result] = await pool.execute(
+            `UPDATE farms f 
+             JOIN farmers fm ON f.farmer_id = fm.id
+             SET ${updates.join(', ')}
+             WHERE f.id = ? AND fm.user_id = ?`,
+            params
+        );
+
+        if (result.matchedRows === 0) {
+            return res.status(404).json({ error: 'Farm not found or unauthorized' });
+        }
+
+        // Return updated farm data (mapped for frontend)
+        const [rows] = await pool.execute('SELECT * FROM farms WHERE id = ?', [req.params.id]);
+        const updated = rows[0];
+        res.json({
+            ...updated,
+            lat: parseFloat(updated.latitude),
+            lng: parseFloat(updated.longitude),
+            barangay: updated.location_barangay,
+            size: updated.farm_size_hectares,
+            current_crop: updated.current_crop
+        });
+    } catch (err) {
+        console.error('Farm patch error:', err);
+        res.status(500).json({ error: 'Failed to update farm' });
+    }
+});
+
 app.post('/api/reports', authenticateToken, async (req, res) => {
     try {
         const data = ReportSchema.parse(req.body);
