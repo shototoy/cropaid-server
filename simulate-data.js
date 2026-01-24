@@ -1,218 +1,1 @@
-import mysql from 'mysql2/promise';
-import dotenv from 'dotenv';
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
-
-dotenv.config();
-
-const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'cropaid',
-    multipleStatements: true
-};
-
-async function simulate() {
-    console.log('🌱 Starting Data Simulation...');
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-        const hashedPassword = await bcrypt.hash('password', 10);
-
-        // Reference Coordinates (Matched to Map Configuration)
-        const barangayCenters = {
-            'Benigno Aquino, Jr.': { lat: 6.5282, lng: 124.6848 },
-            'Dumaguil': { lat: 6.5583, lng: 124.6842 },
-            'Esperanza': { lat: 6.4984, lng: 124.6685 },
-            'Kibid': { lat: 6.5383, lng: 124.6769 },
-            'Lapuz': { lat: 6.5213, lng: 124.6317 },
-            'Liberty': { lat: 6.5364, lng: 124.6317 },
-            'Lopez Jaena': { lat: 6.5092, lng: 124.6866 },
-            'Matapol': { lat: 6.5761, lng: 124.6411 },
-            'Poblacion': { lat: 6.5206, lng: 124.6623 },
-            'Puti': { lat: 6.5164, lng: 124.7095 },
-            'San Jose': { lat: 6.5507, lng: 124.6417 },
-            'San Miguel': { lat: 6.4944, lng: 124.7187 },
-            'Simsiman': { lat: 6.5592, lng: 124.6527 },
-            'Tinago': { lat: 6.5523, lng: 124.7054 }
-        };
-
-        // ==========================================
-        // STATIC DATA INITIALIZATION
-        // ==========================================
-        async function initStaticData() {
-            console.log('   > Initializing Reference Data (Ref Data)...');
-
-            // 1. Pest Categories (Restricted)
-            await connection.execute(`
-                INSERT IGNORE INTO pest_categories (name, description, severity_level, affected_crops) VALUES
-                ('Rice Black Bug', 'Saps the plant of its nutrients causing it to turn reddish brown or yellow.', 'high', '["Rice"]'),
-                ('Rodents', 'Rats that eat crops and grains.', 'medium', '["Rice", "Corn"]')
-            `);
-
-            // 2. Crop Types (Rice Only with Varieties)
-            // Note: Schema supports variety column
-            await connection.execute(`
-                INSERT IGNORE INTO crop_types (name, variety, description, season) VALUES
-                ('Rice', 'Jasmine', 'Aromatic rice variety', 'Wet/Dry'),
-                ('Rice', 'RC-160', 'High yielding variety', 'Wet/Dry'),
-                ('Rice', '7-Tonner', 'High yield hybrid', 'Wet/Dry')
-            `);
-
-            // 3. Barangays (Dynamic from S.S.O.T)
-            const barangayValues = Object.entries(barangayCenters)
-                .map(([name, coords]) => `('${name}', ${coords.lat}, ${coords.lng})`)
-                .join(', ');
-
-            await connection.execute(`
-                INSERT IGNORE INTO barangays (name, latitude, longitude) VALUES ${barangayValues}
-            `);
-
-            // 4. News REMOVED
-        }
-
-        // ==========================================
-        // HELPER FUNCTIONS
-        // ==========================================
-
-        async function registerFarmer(user, profile, farmsData) {
-            console.log(`   > Registering Farmer: ${profile.first_name} ${profile.last_name}...`);
-            const userId = crypto.randomUUID();
-
-            // 1. Create User
-            await connection.execute(
-                `INSERT INTO users (id, username, email, password_hash, role, is_active) VALUES (?, ?, ?, ?, 'farmer', TRUE)`,
-                [userId, user.username, user.email, hashedPassword]
-            );
-
-            // 2. Create Farmer Profile
-            const [farmerResult] = await connection.execute(
-                `INSERT INTO farmers (
-                    user_id, rsbsa_id, first_name, middle_name, last_name, 
-                    address_sitio, address_barangay, address_municipality, address_province, 
-                    cellphone, sex, date_of_birth, civil_status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    userId, profile.rsbsa_id, profile.first_name, profile.middle_name, profile.last_name,
-                    profile.address_sitio, profile.address_barangay, 'Norala', 'South Cotabato',
-                    profile.cellphone, profile.sex, profile.date_of_birth, profile.civil_status
-                ]
-            );
-            const farmerId = farmerResult.insertId;
-
-            // 3. Create Farms (Handle Array)
-            const farms = Array.isArray(farmsData) ? farmsData : [farmsData];
-
-            const createdFarmIds = [];
-            for (const farm of farms) {
-                if (farm) {
-                    const [fRes] = await connection.execute(
-                        `INSERT INTO farms (
-                            farmer_id, location_barangay, location_sitio,
-                            latitude, longitude, farm_size_hectares,
-                            planting_method, date_of_sowing, date_of_transplanting, date_of_harvest,
-                            land_category, soil_type, topography, irrigation_source, tenural_status,
-                            boundary_north, boundary_south, boundary_east, boundary_west,
-                            current_crop, cover_type, amount_cover, insurance_premium,
-                            cltip_sum_insured, cltip_premium
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                        [
-                            farmerId, farm.location_barangay, farm.location_sitio,
-                            farm.latitude, farm.longitude, farm.farm_size_hectares,
-                            farm.planting_method || null, farm.date_of_sowing || null, farm.date_of_transplanting || null, farm.date_of_harvest || null,
-                            farm.land_category || null, farm.soil_type || null, farm.topography || null, farm.irrigation_source || null, farm.tenural_status || null,
-                            farm.boundary_north || null, farm.boundary_south || null, farm.boundary_east || null, farm.boundary_west || null,
-                            farm.current_crop || null, farm.cover_type || null, farm.amount_cover || null, farm.insurance_premium || null,
-                            farm.cltip_sum_insured || null, farm.cltip_premium || null
-                        ]
-                    );
-                    createdFarmIds.push(fRes.insertId);
-                }
-            }
-
-            return { userId, farmerId, farmIds: createdFarmIds, name: `${profile.first_name} ${profile.last_name}` };
-        }
-
-        async function submitReport(user, farmId, type, details, location, lat, lon, daysAgo) {
-            console.log(`   > Submitting ${type} report for ${user.name}...`);
-
-            const [res] = await connection.execute(
-                `INSERT INTO reports (user_id, farm_id, type, status, details, location, latitude, longitude, created_at) 
-                 VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, DATE_SUB(NOW(), INTERVAL ? DAY))`,
-                [user.userId, farmId, type, JSON.stringify(details), location, lat, lon, daysAgo]
-            );
-            const reportId = res.insertId;
-
-            await connection.execute(
-                `INSERT INTO notifications (user_id, type, title, message, reference_id, is_read, created_at)
-                 VALUES (
-                    (SELECT id FROM users WHERE role = 'admin' LIMIT 1), 
-                    'new_report', 
-                    CONCAT(?, ' filed a ', ?, ' report'), 
-                    CONCAT('A new ', ?, ' report has been submitted in ', ?), 
-                    ?, FALSE, DATE_SUB(NOW(), INTERVAL ? DAY)
-                 )`,
-                [user.name, type, type, location, reportId, daysAgo]
-            );
-
-            return reportId;
-        }
-
-        async function verifyReport(reportId, adminNotes, daysAgo) {
-            console.log(`   > Verifying report #${reportId}...`);
-
-            await connection.execute(
-                `UPDATE reports SET status = 'verified', admin_notes = ? WHERE id = ?`,
-                [adminNotes, reportId]
-            );
-
-            const [rows] = await connection.execute('SELECT user_id, type FROM reports WHERE id = ?', [reportId]);
-            if (rows.length > 0) {
-                const { user_id, type } = rows[0];
-                await connection.execute(
-                    `INSERT INTO notifications (user_id, type, title, message, reference_id, is_read, created_at)
-                     VALUES (?, 'status_change', 'Report Verified', 'Your report has been verified by the admin.', ?, FALSE, DATE_SUB(NOW(), INTERVAL ? DAY))`,
-                    [user_id, reportId, daysAgo]
-                );
-            }
-        }
-
-        async function resolveReport(reportId, adminNotes, daysAgo) {
-            console.log(`   > Resolving report #${reportId}...`);
-            await connection.execute(
-                `UPDATE reports SET status = 'resolved', admin_notes = ? WHERE id = ?`,
-                [adminNotes, reportId]
-            );
-
-            const [rows] = await connection.execute('SELECT user_id FROM reports WHERE id = ?', [reportId]);
-            if (rows.length > 0) {
-                const { user_id } = rows[0];
-                await connection.execute(
-                    `INSERT INTO notifications (user_id, type, title, message, reference_id, is_read, created_at)
-                     VALUES (?, 'status_change', 'Report Resolved', 'Your report has been resolved.', ?, TRUE, DATE_SUB(NOW(), INTERVAL ? DAY))`,
-                    [user_id, reportId, daysAgo]
-                );
-            }
-        }
-
-
-        // ==========================================
-        // EXECUTION
-        // ==========================================
-
-        await initStaticData();
-
-        // Farmers generation REMOVED as requested.
-        console.log('✅ Simulation/Reset Complete! (Static Data Only)');
-
-    } catch (err) {
-        console.error('❌ Simulation Failed:', err);
-        process.exit(1);
-    } finally {
-        if (connection) await connection.end();
-    }
-}
-
-simulate();
+import mysql from 'mysql2/promise';import dotenv from 'dotenv';import bcrypt from 'bcryptjs';import crypto from 'crypto';dotenv.config();const dbConfig = {    host: process.env.DB_HOST || 'localhost',    user: process.env.DB_USER || 'root',    password: process.env.DB_PASSWORD || '',    database: process.env.DB_NAME || 'cropaid',    multipleStatements: true};async function simulate() {    console.log('🌱 Starting Data Simulation...');    let connection;    try {        connection = await mysql.createConnection(dbConfig);        const hashedPassword = await bcrypt.hash('password', 10);        const barangayCenters = {            'Benigno Aquino, Jr.': { lat: 6.5282, lng: 124.6848 },            'Dumaguil': { lat: 6.5583, lng: 124.6842 },            'Esperanza': { lat: 6.4984, lng: 124.6685 },            'Kibid': { lat: 6.5383, lng: 124.6769 },            'Lapuz': { lat: 6.5213, lng: 124.6317 },            'Liberty': { lat: 6.5364, lng: 124.6317 },            'Lopez Jaena': { lat: 6.5092, lng: 124.6866 },            'Matapol': { lat: 6.5761, lng: 124.6411 },            'Poblacion': { lat: 6.5206, lng: 124.6623 },            'Puti': { lat: 6.5164, lng: 124.7095 },            'San Jose': { lat: 6.5507, lng: 124.6417 },            'San Miguel': { lat: 6.4944, lng: 124.7187 },            'Simsiman': { lat: 6.5592, lng: 124.6527 },            'Tinago': { lat: 6.5523, lng: 124.7054 }        };        async function initStaticData() {            console.log('   > Initializing Reference Data (Ref Data)...');            await connection.execute(`                INSERT IGNORE INTO pest_categories (name, description, severity_level, affected_crops) VALUES                ('Rice Black Bug', 'Saps the plant of its nutrients causing it to turn reddish brown or yellow.', 'high', '["Rice"]'),                ('Rodents', 'Rats that eat crops and grains.', 'medium', '["Rice", "Corn"]')            `);            await connection.execute(`                INSERT IGNORE INTO crop_types (name, variety, description, season) VALUES                ('Rice', 'Jasmine', 'Aromatic rice variety', 'Wet/Dry'),                ('Rice', 'RC-160', 'High yielding variety', 'Wet/Dry'),                ('Rice', '7-Tonner', 'High yield hybrid', 'Wet/Dry')            `);            const barangayValues = Object.entries(barangayCenters)                .map(([name, coords]) => `('${name}', ${coords.lat}, ${coords.lng})`)                .join(', ');            await connection.execute(`                INSERT IGNORE INTO barangays (name, latitude, longitude) VALUES ${barangayValues}            `);        }        async function registerFarmer(user, profile, farmsData) {            console.log(`   > Registering Farmer: ${profile.first_name} ${profile.last_name}...`);            const userId = crypto.randomUUID();            await connection.execute(                `INSERT INTO users (id, username, email, password_hash, role, is_active) VALUES (?, ?, ?, ?, 'farmer', TRUE)`,                [userId, user.username, user.email, hashedPassword]            );            const [farmerResult] = await connection.execute(                `INSERT INTO farmers (                    user_id, rsbsa_id, first_name, middle_name, last_name,                     address_sitio, address_barangay, address_municipality, address_province,                     cellphone, sex, date_of_birth, civil_status                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,                [                    userId, profile.rsbsa_id, profile.first_name, profile.middle_name, profile.last_name,                    profile.address_sitio, profile.address_barangay, 'Norala', 'South Cotabato',                    profile.cellphone, profile.sex, profile.date_of_birth, profile.civil_status                ]            );            const farmerId = farmerResult.insertId;            const farms = Array.isArray(farmsData) ? farmsData : [farmsData];            const createdFarmIds = [];            for (const farm of farms) {                if (farm) {                    const [fRes] = await connection.execute(                        `INSERT INTO farms (                            farmer_id, location_barangay, location_sitio,                            latitude, longitude, farm_size_hectares,                            planting_method, date_of_sowing, date_of_transplanting, date_of_harvest,                            land_category, soil_type, topography, irrigation_source, tenural_status,                            boundary_north, boundary_south, boundary_east, boundary_west,                            current_crop, cover_type, amount_cover, insurance_premium,                            cltip_sum_insured, cltip_premium                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,                        [                            farmerId, farm.location_barangay, farm.location_sitio,                            farm.latitude, farm.longitude, farm.farm_size_hectares,                            farm.planting_method || null, farm.date_of_sowing || null, farm.date_of_transplanting || null, farm.date_of_harvest || null,                            farm.land_category || null, farm.soil_type || null, farm.topography || null, farm.irrigation_source || null, farm.tenural_status || null,                            farm.boundary_north || null, farm.boundary_south || null, farm.boundary_east || null, farm.boundary_west || null,                            farm.current_crop || null, farm.cover_type || null, farm.amount_cover || null, farm.insurance_premium || null,                            farm.cltip_sum_insured || null, farm.cltip_premium || null                        ]                    );                    createdFarmIds.push(fRes.insertId);                }            }            return { userId, farmerId, farmIds: createdFarmIds, name: `${profile.first_name} ${profile.last_name}` };        }        async function submitReport(user, farmId, type, details, location, lat, lon, daysAgo) {            console.log(`   > Submitting ${type} report for ${user.name}...`);            const [res] = await connection.execute(                `INSERT INTO reports (user_id, farm_id, type, status, details, location, latitude, longitude, created_at)                  VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, DATE_SUB(NOW(), INTERVAL ? DAY))`,                [user.userId, farmId, type, JSON.stringify(details), location, lat, lon, daysAgo]            );            const reportId = res.insertId;            await connection.execute(                `INSERT INTO notifications (user_id, type, title, message, reference_id, is_read, created_at)                 VALUES (                    (SELECT id FROM users WHERE role = 'admin' LIMIT 1),                     'new_report',                     CONCAT(?, ' filed a ', ?, ' report'),                     CONCAT('A new ', ?, ' report has been submitted in ', ?),                     ?, FALSE, DATE_SUB(NOW(), INTERVAL ? DAY)                 )`,                [user.name, type, type, location, reportId, daysAgo]            );            return reportId;        }        async function verifyReport(reportId, adminNotes, daysAgo) {            console.log(`   > Verifying report #${reportId}...`);            await connection.execute(                `UPDATE reports SET status = 'verified', admin_notes = ? WHERE id = ?`,                [adminNotes, reportId]            );            const [rows] = await connection.execute('SELECT user_id, type FROM reports WHERE id = ?', [reportId]);            if (rows.length > 0) {                const { user_id, type } = rows[0];                await connection.execute(                    `INSERT INTO notifications (user_id, type, title, message, reference_id, is_read, created_at)                     VALUES (?, 'status_change', 'Report Verified', 'Your report has been verified by the admin.', ?, FALSE, DATE_SUB(NOW(), INTERVAL ? DAY))`,                    [user_id, reportId, daysAgo]                );            }        }        async function resolveReport(reportId, adminNotes, daysAgo) {            console.log(`   > Resolving report #${reportId}...`);            await connection.execute(                `UPDATE reports SET status = 'resolved', admin_notes = ? WHERE id = ?`,                [adminNotes, reportId]            );            const [rows] = await connection.execute('SELECT user_id FROM reports WHERE id = ?', [reportId]);            if (rows.length > 0) {                const { user_id } = rows[0];                await connection.execute(                    `INSERT INTO notifications (user_id, type, title, message, reference_id, is_read, created_at)                     VALUES (?, 'status_change', 'Report Resolved', 'Your report has been resolved.', ?, TRUE, DATE_SUB(NOW(), INTERVAL ? DAY))`,                    [user_id, reportId, daysAgo]                );            }        }        await initStaticData();        console.log('✅ Simulation/Reset Complete! (Static Data Only)');    } catch (err) {        console.error('❌ Simulation Failed:', err);        process.exit(1);    } finally {        if (connection) await connection.end();    }}simulate();

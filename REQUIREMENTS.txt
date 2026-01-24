@@ -1,0 +1,17 @@
+System Requirements for CropAid Server:
+
+1. Node.js (LTS Version recommended, v18+)
+   - Purpose: To run the Javascript backend.
+   - Download: https://nodejs.org/
+
+2. MySQL Database
+   - You can use the MySQL included in XAMPP, or a standalone MySQL Community Server.
+   - The database server must be RUNNING before starting the application.
+   - Default Port: 3306
+
+3. Internet Connection
+   - Required for the initial installation of dependencies (npm install).
+
+Note:
+- The deployment script (deploy-server.bat) will automatically install 'pm2' (Process Manager) to keep the app running in the background.
+- Ensure you run the deployment script as Administrator if you encounter permission errors.
