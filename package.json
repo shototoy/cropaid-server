@@ -8,6 +8,7 @@
                 "dev": "node --watch index.js",
                 "setup": "node setup-db.js",
                 "simulate": "node simulate-data.js",
+                "reset": "node setup-db.js && node simulate-data.js",
                 "deploy": "node index.js"
         },
         "dependencies": {
