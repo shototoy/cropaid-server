@@ -45,20 +45,20 @@ async function simulate() {
         async function initStaticData() {
             console.log('   > Initializing Reference Data (Ref Data)...');
 
-            // 1. Pest Categories
+            // 1. Pest Categories (Restricted)
             await connection.execute(`
                 INSERT IGNORE INTO pest_categories (name, description, severity_level, affected_crops) VALUES
                 ('Rice Black Bug', 'Saps the plant of its nutrients causing it to turn reddish brown or yellow.', 'high', '["Rice"]'),
-                ('Army Worm', 'Larvae feed on leaves and stems, causing massive defoliation.', 'high', '["Rice", "Corn", "Vegetables"]'),
                 ('Rodents', 'Rats that eat crops and grains.', 'medium', '["Rice", "Corn"]')
             `);
 
-            // 2. Crop Types
+            // 2. Crop Types (Rice Only with Varieties)
+            // Note: Schema supports variety column
             await connection.execute(`
-                INSERT IGNORE INTO crop_types (name, description, season) VALUES
-                ('Rice', 'Staple food crop', 'Wet/Dry'),
-                ('Corn', 'Cereal grain', 'Dry'),
-                ('Vegetables', 'Various garden crops', 'Year-round')
+                INSERT IGNORE INTO crop_types (name, variety, description, season) VALUES
+                ('Rice', 'Jasmine', 'Aromatic rice variety', 'Wet/Dry'),
+                ('Rice', 'RC-160', 'High yielding variety', 'Wet/Dry'),
+                ('Rice', '7-Tonner', 'High yield hybrid', 'Wet/Dry')
             `);
 
             // 3. Barangays (Dynamic from S.S.O.T)
@@ -70,18 +70,7 @@ async function simulate() {
                 INSERT IGNORE INTO barangays (name, latitude, longitude) VALUES ${barangayValues}
             `);
 
-            // 4. News & Advisories (Ensure Admin UUID exists from seed.sql)
-            // Using INSERT IGNORE based on title/content unique constraint (if any) or just accept duplicates if table doesn't have unique keys on content
-            // Assuming seed.sql runs first, admin exists.
-            await connection.execute(`
-                INSERT INTO news (title, content, type, priority, created_at, is_active, author_id) VALUES
-                ('Pest Alert: Black Bug Infestation Warning', 'The Municipal Agriculture Office has detected increased black bug activity in several barangays including Poblacion, San Miguel, and Benigno Aquino. Farmers are advised to monitor their rice fields closely and report any signs of infestation immediately.', 'alert', 'high', DATE_SUB(NOW(), INTERVAL 1 DAY), TRUE, 'admin-uuid'),
-                ('Weather Advisory: Dry Season Preparations', 'The Philippine Atmospheric, Geophysical and Astronomical Services Administration (PAGASA) forecasts below-normal rainfall in the coming months. Farmers are encouraged to implement water-saving irrigation techniques and consider drought-resistant crop varieties.', 'advisory', 'medium', DATE_SUB(NOW(), INTERVAL 2 DAY), TRUE, 'admin-uuid'),
-                ('New Seed Distribution Program', 'The Department of Agriculture, in partnership with the local government, will be distributing free certified high-yield rice seeds to all RSBSA-registered farmers. Distribution will be at the Municipal Agriculture Office starting Monday.', 'news', 'low', DATE_SUB(NOW(), INTERVAL 3 DAY), TRUE, 'admin-uuid'),
-                ('Flood Warning: Low-lying Areas', 'PAGASA has issued a flood warning for low-lying areas due to continuous rainfall. Farmers are advised to harvest mature crops if possible and move equipment to higher ground. The CropAid system is ready to receive flood damage reports.', 'alert', 'high', DATE_SUB(NOW(), INTERVAL 4 DAY), TRUE, 'admin-uuid'),
-                ('Free Pest Control Training', 'The Municipal Agriculture Office is conducting a free Integrated Pest Management (IPM) training for farmers. Topics include biological pest control, proper pesticide application, and early detection methods. Register at the MAO office.', 'news', 'low', DATE_SUB(NOW(), INTERVAL 5 DAY), TRUE, 'admin-uuid'),
-                ('Fertilizer Subsidy Application Open', 'The Fertilizer Subsidy Program is now accepting applications. Eligible farmers can receive up to 50% discount on fertilizers. Bring your RSBSA card and valid ID to the Municipal Agriculture Office to apply.', 'news', 'medium', DATE_SUB(NOW(), INTERVAL 6 DAY), TRUE, 'admin-uuid')
-            `);
+            // 4. News REMOVED
         }
 
         // ==========================================
@@ -213,62 +202,10 @@ async function simulate() {
         // EXECUTION
         // ==========================================
 
-        // ==========================================
-        // EXECUTION
-        // ==========================================
-
         await initStaticData();
 
-        // --- Generate 1 Farmer per Barangay (14 Total) ---
-        const allBarangays = Object.keys(barangayCenters);
-        console.log(`\nSeeding ${allBarangays.length} barangays with 1 farmer each...`);
-
-        let counter = 1;
-        for (const barangay of allBarangays) {
-            const center = barangayCenters[barangay];
-            // Create a generic farmer for this barangay
-            const farmerName = `Farmer ${barangay.replace(/[^a-zA-Z]/g, '')}`;
-            const username = `farmer.${barangay.toLowerCase().replace(/[^a-z]/g, '')}`;
-
-            const isRice = Math.random() > 0.5;
-            const hasInsurance = Math.random() > 0.3;
-
-            const communityFarms = [{
-                location_barangay: barangay,
-                location_sitio: 'Central',
-                latitude: center.lat, // Exact center for visibility
-                longitude: center.lng,
-                farm_size_hectares: (Math.random() * 3 + 0.5).toFixed(1), // Random size 0.5 - 3.5 ha
-                planting_method: isRice ? (Math.random() > 0.5 ? 'Transplanting' : 'Direct Seeding') : 'Direct Seeding',
-                date_of_sowing: '2025-11-01',
-                land_category: Math.random() > 0.6 ? 'Irrigated' : 'Rainfed',
-                soil_type: ['Clay Loam', 'Silty Clay Loam', 'Silty Loam', 'Sandy Loam'][Math.floor(Math.random() * 4)],
-                topography: ['Flat', 'Rolling', 'Hilly'][Math.floor(Math.random() * 3)],
-                irrigation_source: ['NIA/CIS', 'Deep Well', 'SWIP', 'STW'][Math.floor(Math.random() * 4)],
-                tenural_status: ['Owner', 'Lessee', 'Tenant'][Math.floor(Math.random() * 3)],
-                boundary_north: 'N/A', boundary_south: 'N/A', boundary_east: 'N/A', boundary_west: 'N/A',
-                current_crop: isRice ? 'Rice' : 'Corn',
-                cover_type: hasInsurance ? (Math.random() > 0.5 ? 'Multi-Risk' : 'Natural Disaster') : null,
-                amount_cover: hasInsurance ? (Math.random() * 50000 + 10000).toFixed(2) : 0,
-                insurance_premium: hasInsurance ? (Math.random() * 3000 + 500).toFixed(2) : 0,
-                cltip_sum_insured: hasInsurance ? (Math.random() * 10000).toFixed(2) : 0,
-                cltip_premium: hasInsurance ? (Math.random() * 500).toFixed(2) : 0
-            }];
-
-            await registerFarmer(
-                { username: username, email: `${username}@cropaid.com` },
-                {
-                    rsbsa_id: `12-63-11-${100 + counter}`,
-                    first_name: 'Community', middle_name: 'X', last_name: `Farmer ${barangay}`,
-                    address_sitio: 'Purok 1', address_barangay: barangay, cellphone: `09000000${100 + counter}`,
-                    sex: 'Male', date_of_birth: '1980-01-01', civil_status: 'Married'
-                },
-                communityFarms
-            );
-            counter++;
-        }
-
-        console.log('✅ Simulation Complete!');
+        // Farmers generation REMOVED as requested.
+        console.log('✅ Simulation/Reset Complete! (Static Data Only)');
 
     } catch (err) {
         console.error('❌ Simulation Failed:', err);
