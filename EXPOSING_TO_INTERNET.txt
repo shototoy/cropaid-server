@@ -1,0 +1,54 @@
+HOW TO EXPOSE YOUR LOCAL SERVER TO THE INTERNET
+===============================================
+To allow the CropAid app (running on mobile phones or other networks) to connect to your computer-hosted backend, you need to make your local server accessible via a public URL.
+
+Here are the two best methods:
+
+METHOD 1: Cloudflare Tunnel (Recommended - Easiest & Secure)
+------------------------------------------------------------
+This method provides a FREE https:// URL (secure) and works even if your router blocks ports. No router configuration needed.
+
+1. Download 'cloudflared' for Windows:
+   https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
+
+2. Open Command Prompt where you downloaded it.
+
+3. Run the tunnel pointing to your local server port (3000):
+   cloudflared tunnel --url http://localhost:3000
+
+4. Copy the unique URL it generates (example: https://crop-aid-demo.trycloudflare.com).
+
+5. On your Frontend Computer (Development):
+   - Open .env file
+   - Update VITE_API_URL=https://crop-aid-demo.trycloudflare.com/api
+   - Re-run 'npm run build'
+   - Re-deploy to XAMPP.
+
+METHOD 2: Ngrok (Good for quick testing)
+----------------------------------------
+Similar to Cloudflare but free tier has limits or temporary URLs.
+
+1. Install Ngrok: https://ngrok.com/download
+2. Run: ngrok http 3000
+3. Use the https URL it provides in your .env configuration.
+
+METHOD 3: Port Forwarding (Advanced - Permanent)
+------------------------------------------------
+1. Find your computer's Local IP (run 'ipconfig', e.g., 192.168.1.5).
+2. Log in to your Router Admin Panel.
+3. Find "Port Forwarding" settings.
+4. Add a rule: 
+   - External Port: 3000
+   - Internal Port: 3000
+   - Internal IP: Your Local IP (192.168.1.5)
+5. Find your Public IP (search "what is my ip" on Google).
+6. Your connection URL is: http://YOUR_PUBLIC_IP:3000/api
+7. Update .env with this URL and rebuild.
+
+Note: Your Public IP might change after restarting your router unless you pay for a Static IP or use DDNS.
+
+IMPORTANT SECURITY WARNING:
+---------------------------
+When exposing your server, anyone with the URL can attempt to access it.
+- Ensure you have changed the JWT_SECRET in .env.
+- Ensure your database passwords are strong.
