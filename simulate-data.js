@@ -213,118 +213,18 @@ async function simulate() {
         // EXECUTION
         // ==========================================
 
-        await initStaticData();
+        // ==========================================
+        // EXECUTION
+        // ==========================================
 
         await initStaticData();
 
-        // --- Farmer 1: Shara ---
-        const sharaFarms = [
-            {
-                location_barangay: 'San Jose', location_sitio: 'Purok 1',
-                latitude: barangayCenters['San Jose'].lat, longitude: barangayCenters['San Jose'].lng, // Exact Center
-                farm_size_hectares: 2.5,
-                planting_method: 'Transplanting', date_of_sowing: '2025-11-01', date_of_transplanting: '2025-11-20', date_of_harvest: '2026-03-15',
-                land_category: 'Irrigated', soil_type: 'Clay Loam', topography: 'Flat', irrigation_source: 'NIA/CIS', tenural_status: 'Owner',
-                boundary_north: 'Road', boundary_south: 'River', boundary_east: 'Machico Farm', boundary_west: 'Canal',
-                current_crop: 'Rice', cover_type: 'Multi-Risk', amount_cover: 50000.00, insurance_premium: 2500.00,
-                cltip_sum_insured: 10000.00, cltip_premium: 500.00
-            },
-            {
-                location_barangay: 'San Jose', location_sitio: 'Purok 2',
-                latitude: barangayCenters['San Jose'].lat + 0.003, longitude: barangayCenters['San Jose'].lng + 0.003, // Slight Offset
-                farm_size_hectares: 1.5,
-                planting_method: 'Direct Seeding', date_of_sowing: '2025-12-01', date_of_harvest: '2026-04-01',
-                land_category: 'Rainfed', soil_type: 'Silty Loam', topography: 'Flat', irrigation_source: 'STW', tenural_status: 'Lessee',
-                boundary_north: 'Desamero Farm 1', boundary_south: 'Highway', boundary_east: 'Vacant Lot', boundary_west: 'Residential',
-                current_crop: 'Corn', cover_type: 'Natural Disaster', amount_cover: 30000.00, insurance_premium: 1500.00
-            }
-        ];
-
-        const shara = await registerFarmer(
-            { username: 'shara.desamero', email: 'shara@gmail.com' },
-            {
-                rsbsa_id: '12-63-11-001', first_name: 'Shara Dane', middle_name: 'V', last_name: 'Desamero',
-                address_sitio: 'Purok 1', address_barangay: 'San Jose', cellphone: '09171234567',
-                sex: 'Female', date_of_birth: '1995-05-15', civil_status: 'Single'
-            },
-            sharaFarms
-        );
-
-        // Shara Report 1: Pest (Pending) - Linked to Farm 1
-        await submitReport(shara, shara.farmIds[0], 'pest',
-            { cropType: "Rice", pestType: "Rice Black Bug", severity: "High", affectedArea: "1.5", damageLevel: "Severe", description: "Black bug infestation observed in rice field mostly in the lower part." },
-            'San Jose', sharaFarms[0].latitude, sharaFarms[0].longitude, 2
-        );
-
-        // Shara Report 2: Drought (Verified) - Linked to Farm 2
-        const sharaId2 = await submitReport(shara, shara.farmIds[1], 'drought',
-            { cropType: "Corn", severity: "Medium", affectedArea: "1.0", damageLevel: "Moderate", description: "Leaves curling due to lack of water for 2 weeks on the second farm." },
-            'San Jose', sharaFarms[1].latitude, sharaFarms[1].longitude, 10
-        );
-        await verifyReport(sharaId2, "Verified during field inspection. Assistance recommended.", 9);
-
-
-        // --- Farmer 2: James ---
-        const jamesFarms = [
-            {
-                location_barangay: 'Liberty', location_sitio: 'Purok 3',
-                latitude: barangayCenters['Liberty'].lat, longitude: barangayCenters['Liberty'].lng,
-                farm_size_hectares: 1.8,
-                planting_method: 'Direct Seeding', date_of_sowing: '2025-11-15', date_of_harvest: '2026-02-28',
-                land_category: 'Rainfed', soil_type: 'Sandy Loam', topography: 'Rolling', irrigation_source: 'Deep Well', tenural_status: 'Owner',
-                boundary_north: 'Desamero Farm', boundary_south: 'Hill', boundary_east: 'Road', boundary_west: 'Forest',
-                current_crop: 'Vegetables', cover_type: 'Natural Disaster', amount_cover: 20000.00, insurance_premium: 1000.00
-            },
-            {
-                location_barangay: 'Esperanza', location_sitio: 'Riverside',
-                latitude: barangayCenters['Esperanza'].lat, longitude: barangayCenters['Esperanza'].lng,
-                farm_size_hectares: 3.0,
-                planting_method: 'Transplanting', date_of_sowing: '2025-10-01', date_of_transplanting: '2025-10-25', date_of_harvest: '2026-02-15',
-                land_category: 'Irrigated', soil_type: 'Clay Loam', topography: 'Flat', irrigation_source: 'SWIP', tenural_status: 'Tenant',
-                boundary_north: 'River', boundary_south: 'Access Road', boundary_east: 'Corn Field', boundary_west: 'Coconut Plantation',
-                current_crop: 'Rice', cover_type: 'Multi-Risk', amount_cover: 60000.00, insurance_premium: 3000.00
-            }
-        ];
-
-        const james = await registerFarmer(
-            { username: 'james.machico', email: 'james@gmail.com' },
-            {
-                rsbsa_id: '12-63-11-002', first_name: 'James', middle_name: 'B', last_name: 'Machico',
-                address_sitio: 'Purok 3', address_barangay: 'Liberty', cellphone: '09181235555',
-                sex: 'Male', date_of_birth: '1990-08-20', civil_status: 'Married'
-            },
-            jamesFarms
-        );
-
-        // James Report 1: Flood (Resolved) - Linked to Farm 1 (Liberty)
-        const jamesId1 = await submitReport(james, james.farmIds[0], 'flood',
-            { cropType: "Vegetables", waterLevel: "High", affectedArea: "1.0", damageLevel: "High", description: "Vegetable farm submerged in flood waters due to heavy rain." },
-            'Liberty', jamesFarms[0].latitude, jamesFarms[0].longitude, 30
-        );
-        await verifyReport(jamesId1, "Verified via satellite imagery.", 29);
-        await resolveReport(jamesId1, "Seedlings provided for replanting.", 25);
-
-        // James Report 2: Mix (Pending) - Linked to Farm 2 (Esperanza)
-        await submitReport(james, james.farmIds[1], 'mix',
-            { damageTypes: ["Pest", "Flood"], affectedArea: "2.5", description: "Heavy rains caused flooding which led to a pest outbreak (snails)." },
-            'Esperanza', jamesFarms[1].latitude, jamesFarms[1].longitude, 5
-        );
-
-
-        // James Report 2: Pest (Pending - Recent) - Linked to Farm 2 (Esperanza)
-        await submitReport(james, james.farmIds[1], 'pest',
-            { cropType: "Corn", pestType: "Army Worm", severity: "Low", affectedArea: "0.2", damageLevel: "Minor", description: "Early signs of army worm on young corn in Esperanza farm." },
-            'Esperanza', jamesFarms[1].latitude, jamesFarms[1].longitude, 0 // Today
-        );
-
-        // --- 3. Fill Remaning Barangays (Community Population) ---
-        const existingBarangays = ['San Jose', 'Liberty', 'Esperanza'];
-        const remainingBarangays = Object.keys(barangayCenters).filter(b => !existingBarangays.includes(b));
-
-        console.log(`\nSeeeding remaining ${remainingBarangays.length} barangays...`);
+        // --- Generate 1 Farmer per Barangay (14 Total) ---
+        const allBarangays = Object.keys(barangayCenters);
+        console.log(`\nSeeding ${allBarangays.length} barangays with 1 farmer each...`);
 
         let counter = 1;
-        for (const barangay of remainingBarangays) {
+        for (const barangay of allBarangays) {
             const center = barangayCenters[barangay];
             // Create a generic farmer for this barangay
             const farmerName = `Farmer ${barangay.replace(/[^a-zA-Z]/g, '')}`;
