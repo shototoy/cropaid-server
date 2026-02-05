@@ -1343,7 +1343,13 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
         });
     } catch (err) {
         console.error('Notifications error:', err);
-        res.status(500).json({ error: 'Failed to fetch notifications' });
+        console.error('Error details:', {
+            message: err.message,
+            code: err.code,
+            sqlMessage: err.sqlMessage,
+            sql: err.sql
+        });
+        res.status(500).json({ error: 'Failed to fetch notifications', details: err.message });
     }
 });
 
