@@ -406,10 +406,10 @@ app.get('/api/farmer/farms', authenticateToken, async (req, res) => {
 });
 app.get('/api/options', async (req, res) => {
     try {
-        const [crops] = await pool.execute('SELECT name FROM crop_types WHERE is_active = TRUE ORDER BY name');
+        const [crops] = await pool.execute('SELECT name, variety FROM crop_types WHERE is_active = TRUE ORDER BY name');
         const [pests] = await pool.execute('SELECT name, severity_level FROM pest_categories WHERE is_active = TRUE ORDER BY name');
         res.json({
-            crops: crops.map(c => c.name),
+            crops: crops.map(c => c.variety ? `${c.name} (${c.variety})` : c.name),
             pests: pests.map(p => ({ name: p.name, severity: p.severity_level }))
         });
     } catch (err) {
@@ -1759,7 +1759,7 @@ app.get('/api/pest-types', async (req, res) => {
 });
 app.get('/api/crop-types', async (req, res) => {
     try {
-        const [rows] = await pool.execute('SELECT id, name, season FROM crop_types WHERE is_active = TRUE ORDER BY name');
+        const [rows] = await pool.execute('SELECT id, name, variety, season FROM crop_types WHERE is_active = TRUE ORDER BY name');
         if (rows.length > 0) return res.json(rows);
     } catch (err) { }
     res.json([
