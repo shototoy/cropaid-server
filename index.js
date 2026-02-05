@@ -1311,6 +1311,8 @@ app.get('/api/admin/reports/:id/photo', authenticateToken, requireAdmin, async (
 app.get('/api/notifications', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
+        console.log(`[DEBUG] Fetching notifications for UserID: ${userId}`); // DEBUG LOG
+
         const limit = parseInt(req.query.limit) || 50;
         const afterId = req.query.after_id ? parseInt(req.query.after_id) : null;
 
@@ -1326,6 +1328,7 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
         params.push(limit);
 
         const [rows] = await pool.execute(query, params);
+        console.log(`[DEBUG] Found ${rows.length} notifications for UserID: ${userId}`); // DEBUG LOG
 
         // Get accurate unread count (always total)
         const [unreadCountResult] = await pool.execute(
