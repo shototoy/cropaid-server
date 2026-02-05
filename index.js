@@ -1324,14 +1324,18 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
             params.push(afterId);
         }
 
-        query += ` ORDER BY created_at DESC LIMIT ?`;
-        params.push(limit);
+        // query += ` ORDER BY created_at DESC LIMIT ?`;
+        // params.push(limit);
+        // Simplified query construction to avoid potential prepared statement issues on some mysql versions/drivers
+        query += ` ORDER BY created_at DESC LIMIT ${limit}`;
 
-        const [rows] = await pool.execute(query, params);
-        console.log(`[DEBUG] Found ${rows.length} notifications for UserID: ${userId}`); // DEBUG LOG
+        // Use pool.query instead of execute for better compatibility with some drivers/versions
+        const [rows] = await pool.query(query, params);
+        console.log(`[DEBUG] Found ${rows.length} notifications for UserID: ${userId}`);
 
         // Get accurate unread count (always total)
-        const [unreadCountResult] = await pool.execute(
+        // Using query instead of execute here too
+        const [unreadCountResult] = await pool.query(
             `SELECT COUNT(*) as count FROM notifications 
              WHERE user_id = ? AND is_read = FALSE`,
             [userId]
