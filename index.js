@@ -1279,19 +1279,13 @@ app.patch('/api/admin/reports/:id/status', authenticateToken, requireAdmin, asyn
         try {
             const [report] = await pool.execute('SELECT user_id, type FROM reports WHERE id = ?', [req.params.id]);
             if (report[0]) {
-                const [existing] = await pool.execute(
-                    `SELECT id FROM notifications 
-                     WHERE user_id = ? AND reference_id = ? AND title = ? 
-                     AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)`,
-                    [report[0].user_id, req.params.id.toString(), `Report ${status}`]
+                // Simplified notification logic: Always insert, rely on user to not spam
+                // (Or we can rely on client-side debouncing, but for now we want to ensure notifs arrive)
+                await pool.execute(
+                    `INSERT INTO notifications (user_id, type, title, message, reference_id)
+                        VALUES (?, 'status_change', ?, ?, ?)`,
+                    [report[0].user_id, `Report ${status}`, `Your ${report[0].type} report has been ${status}`, req.params.id.toString()]
                 );
-                if (existing.length === 0) {
-                    await pool.execute(
-                        `INSERT INTO notifications (user_id, type, title, message, reference_id)
-                         VALUES (?, 'status_change', ?, ?, ?)`,
-                        [report[0].user_id, `Report ${status}`, `Your ${report[0].type} report has been ${status}`, req.params.id.toString()]
-                    );
-                }
             }
         } catch (e) { }
         res.json({ message: 'Status updated' });
